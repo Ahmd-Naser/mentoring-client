@@ -24,6 +24,21 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   {
+    path: 'groups',
+    loadComponent: () => import('./features/groups/groups-list/groups-list.component').then(m => m.GroupsListComponent),
+    canActivate: [authGuard]
+  },
+  {
+    path: 'groups/:id',
+    loadComponent: () => import('./features/groups/group-details/group-details.component').then(m => m.GroupDetailsComponent),
+    canActivate: [authGuard]
+  },
+  {
+    path: 'problems',
+    loadComponent: () => import('./features/problems/problems-list/problems-list.component').then(m => m.ProblemsListComponent),
+    canActivate: [authGuard]
+  },
+  { 
     path: '**',
     redirectTo: 'dashboard'
   }
