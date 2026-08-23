@@ -34,6 +34,12 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   {
+    // 🌟 مسار مساحة عمل وتتبع المسألة
+    path: 'groups/:groupId/problems/:problemId',
+    loadComponent: () => import('./features/groups/problem-workspace/problem-workspace.component').then(m => m.ProblemWorkspaceComponent),
+    canActivate: [authGuard]
+  },
+  {
     path: 'problems',
     loadComponent: () => import('./features/problems/problems-list/problems-list.component').then(m => m.ProblemsListComponent),
     canActivate: [authGuard]
