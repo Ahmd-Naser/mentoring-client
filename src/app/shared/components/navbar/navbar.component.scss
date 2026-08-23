@@ -72,3 +72,18 @@
     }
   }
 }
+
+.user-name-link {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #334155;
+  text-decoration: none;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  transition: background 0.2s;
+
+  &:hover {
+    background-color: #f1f5f9;
+    color: #6366f1;
+  }
+}

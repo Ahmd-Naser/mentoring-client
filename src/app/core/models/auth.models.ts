@@ -54,3 +54,22 @@ export interface RefreshTokenRequest {
   token: string;
   refreshToken: string;
 }
+
+export interface ConfirmEmailRequest {
+  userId: string;
+  code: string;
+}
+
+export interface ResendConfirmationEmailRequest {
+  email: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  userId?: string;
+  code: string;
+  newPassword: string;
+}

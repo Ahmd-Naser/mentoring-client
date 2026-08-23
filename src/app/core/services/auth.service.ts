@@ -120,4 +120,27 @@ export class AuthService {
       return null;
     }
   }
+
+  // أضف هذه الدالة داخل كلاس AuthService
+  updateCurrentUser(partialUser: Partial<User>): void {
+    const current = this.currentUser(); // أو الإشارة الداخلية _currentUser()
+    if (current) {
+      const updated = { ...current, ...partialUser };
+
+      // إذا كنت تستخدم _currentUser داخلياً:
+      // this._currentUser.set(updated);
+      // أو إذا كان currentUser هو الـ WritableSignal مباشرة:
+      (this.currentUser as any).set?.(updated) || this.setCurrentUserInternal(updated);
+
+      localStorage.setItem('mentoring_user', JSON.stringify(updated));
+    }
+  }
+
+  private setCurrentUserInternal(user: User): void {
+    if ('set' in this.currentUser) {
+      (this.currentUser as any).set(user);
+    }
+  }
+
+  
 }

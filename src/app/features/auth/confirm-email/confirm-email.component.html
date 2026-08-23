@@ -1,0 +1,58 @@
+<div class="auth-page">
+  <div class="auth-card">
+    
+    <!-- State 1: Verifying -->
+    @if (state() === 'verifying') {
+      <div class="status-box">
+        <div class="spinner"></div>
+        <h2>Verifying Your Email...</h2>
+        <p>Please wait while we confirm your email address and activate your account.</p>
+      </div>
+    }
+
+    <!-- State 2: Success -->
+    @if (state() === 'success') {
+      <div class="status-box">
+        <div class="icon-circle success">✓</div>
+        <h2>Email Confirmed!</h2>
+        <p>Your account is now fully verified. You can log in and start solving problems.</p>
+        <a routerLink="/auth/login" class="btn-primary">Go to Login</a>
+      </div>
+    }
+
+    <!-- State 3: Error & Resend Option -->
+    @if (state() === 'error') {
+      <div class="status-box">
+        <div class="icon-circle error">✕</div>
+        <h2>Verification Failed</h2>
+        <p class="error-msg">{{ errorMessage() }}</p>
+
+        <div class="resend-section">
+          <h3>Need a new verification link?</h3>
+          @if (resendSuccess()) {
+            <div class="alert-success">
+              A fresh verification link has been sent to your email.
+            </div>
+          } @else {
+            <form [formGroup]="resendForm" (ngSubmit)="onResendSubmit()">
+              <div class="form-group">
+                <input
+                  type="email"
+                  formControlName="email"
+                  placeholder="Enter your registered email"
+                  [class.is-invalid]="resendForm.get('email')?.touched && resendForm.get('email')?.invalid"
+                />
+              </div>
+              <button type="submit" class="btn-secondary" [disabled]="isResending()">
+                {{ isResending() ? 'Sending...' : 'Resend Verification Email' }}
+              </button>
+            </form>
+          }
+        </div>
+
+        <a routerLink="/auth/login" class="back-link">&larr; Back to Login</a>
+      </div>
+    }
+
+  </div>
+</div>

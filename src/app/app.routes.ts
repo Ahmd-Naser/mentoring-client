@@ -29,6 +29,12 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   {
+    // 🌟 مسار الملف الشخصي وإعدادات الحساب
+    path: 'profile',
+    loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent),
+    canActivate: [authGuard]
+  },
+  {
     path: 'groups/:id',
     loadComponent: () => import('./features/groups/group-details/group-details.component').then(m => m.GroupDetailsComponent),
     canActivate: [authGuard]
@@ -43,6 +49,24 @@ export const routes: Routes = [
     path: 'problems',
     loadComponent: () => import('./features/problems/problems-list/problems-list.component').then(m => m.ProblemsListComponent),
     canActivate: [authGuard]
+  },
+  {
+    // 🌟 تأكيد البريد الإلكتروني
+    path: 'auth/confirm-email',
+    loadComponent: () => import('./features/auth/confirm-email/confirm-email.component').then(m => m.ConfirmEmailComponent),
+    canActivate: [guestGuard]
+  },
+  {
+    // 🌟 طلب استعادة كلمة المرور
+    path: 'auth/forgot-password',
+    loadComponent: () => import('./features/auth/forgot-password/forgot-password.component').then(m => m.ForgotPasswordComponent),
+    canActivate: [guestGuard]
+  },
+  {
+    // 🌟 تعيين كلمة المرور الجديدة
+    path: 'auth/reset-password',
+    loadComponent: () => import('./features/auth/reset-password/reset-password.component').then(m => m.ResetPasswordComponent),
+    canActivate: [guestGuard]
   },
   { 
     path: '**',

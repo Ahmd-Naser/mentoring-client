@@ -25,7 +25,9 @@
     <div class="nav-user">
       @if (currentUser(); as user) {
         <div class="user-info">
-          <span class="user-name">{{ user.firstName }} {{ user.lastName }}</span>
+          <a routerLink="/profile" class="user-name-link" title="Manage Profile">
+            👤 {{ user.firstName }} {{ user.lastName }}
+          </a>
           <button class="btn-logout" (click)="onLogout()">Logout</button>
         </div>
       }
