@@ -127,9 +127,9 @@
                 </tr>
               </thead>
               <tbody>
-                @for (prob of groupProblems(); track prob.id ; let idx = $index) {
+                @for (prob of groupProblems(); track prob.problemId ; let idx = $index) {
                   <tr>
-                    <td class="col-id">{{ prob.id }}</td>
+                    <td class="col-id">{{ prob.problemId }}</td>
                     <td class="col-title">
                       <a [href]="prob.link" target="_blank" rel="noopener noreferrer" class="link-title">
                         {{ prob.name }} &nearr;
@@ -145,7 +145,7 @@
                     </td>
                     <td>
                       <!-- مساحة عمل وحل المسألة للمتدربين -->
-                      <a [routerLink]="['/groups', g.id, 'problems', prob.id]" class="btn-workspace">
+                      <a [routerLink]="['/groups', g.id, 'problems', prob.problemId]" class="btn-workspace">
                         Solve / Track &rarr;
                       </a>
                     </td>

@@ -26,7 +26,7 @@ export interface AddTraineeRequest {
 }
 
 export interface GroupProblemResponse {
-  id: number;
+  problemId: number;
   name: string;
   link: string;
   difficulty: Difficulty;
