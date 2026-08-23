@@ -1,0 +1,238 @@
+<app-navbar></app-navbar>
+
+<main class="details-container">
+  @if (isLoading()) {
+    <div class="state-loading">
+      <div class="spinner"></div>
+      <p>Loading group details...</p>
+    </div>
+  } @else if (group(); as g) {
+    <!-- Header Section -->
+    <header class="group-hero">
+      <div class="hero-top">
+        <a routerLink="/groups" class="back-link">&larr; Back to Groups</a>
+        @if (isOwner()) {
+          <span class="badge badge-owner">You are the Mentor (Owner)</span>
+        } @else {
+          <span class="badge badge-member">You are a Trainee</span>
+        }
+      </div>
+
+      <h1>{{ g.name }}</h1>
+      <p class="hero-desc">{{ g.description }}</p>
+
+      <div class="hero-meta">
+        <span>👤 Mentor: <strong>{{ g.ownerName }}</strong></span>
+        <span>👥 Trainees: <strong>{{ trainees().length }}</strong></span>
+        <span>💻 Problems: <strong>{{ groupProblems().length }}</strong></span>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tabs-nav">
+      <button 
+        [class.active]="activeTab() === 'overview'" 
+        (click)="activeTab.set('overview')">
+        Overview
+      </button>
+      <button 
+        [class.active]="activeTab() === 'trainees'" 
+        (click)="activeTab.set('trainees')">
+        Trainees ({{ trainees().length }})
+      </button>
+      <button 
+        [class.active]="activeTab() === 'problems'" 
+        (click)="activeTab.set('problems')">
+        Problems ({{ groupProblems().length }})
+      </button>
+    </nav>
+
+    <!-- Tab 1: Overview -->
+    @if (activeTab() === 'overview') {
+      <section class="tab-content">
+        <div class="content-card">
+          <h3>About this Group</h3>
+          <p>{{ g.description }}</p>
+        </div>
+
+        @if (isOwner()) {
+          <div class="owner-controls-card">
+            <h3>⚡ Mentor Actions</h3>
+            <p>As the owner of this group, you can manage participants and assign coding problems.</p>
+            <div class="actions-row">
+              <button class="btn-primary" (click)="openAddTraineeModal()">+ Add Trainee</button>
+              <button class="btn-secondary" (click)="openAddProblemModal()">+ Assign Problem</button>
+            </div>
+          </div>
+        }
+      </section>
+    }
+
+    <!-- Tab 2: Trainees -->
+    @if (activeTab() === 'trainees') {
+      <section class="tab-content">
+        <div class="tab-header">
+          <h2>Enrolled Trainees ({{ trainees().length }})</h2>
+          @if (isOwner()) {
+            <button class="btn-primary" (click)="openAddTraineeModal()">+ Add Trainee</button>
+          }
+        </div>
+
+        @if (trainees().length === 0) {
+          <div class="empty-state">
+            <p>No trainees have been added to this group yet.</p>
+          </div>
+        } @else {
+          <div class="trainees-list">
+            @for (trainee of trainees(); track (trainee.id || trainee.email || $index)) {
+              <div class="trainee-item">
+                <div class="avatar">
+                  {{ (trainee.name[0] || 'U') | uppercase }}
+                </div>
+                <div class="info">
+                  <h4>{{ trainee.name ? trainee.name : trainee.email }}</h4>
+                  <p>{{ trainee.email }}</p>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    }
+
+    <!-- Tab 3: Problems -->
+    @if (activeTab() === 'problems') {
+      <section class="tab-content">
+        <div class="tab-header">
+          <h2>Assigned Problems ({{ groupProblems().length }})</h2>
+          @if (isOwner()) {
+            <button class="btn-primary" (click)="openAddProblemModal()">+ Assign Problem</button>
+          }
+        </div>
+
+        @if (groupProblems().length === 0) {
+          <div class="empty-state">
+            <p>No problems assigned to this group yet.</p>
+          </div>
+        } @else {
+          <div class="table-card">
+            <table class="problems-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Problem Name</th>
+                  <th>Difficulty</th>
+                  <th>Deadline</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (prob of groupProblems(); track prob.id ; let idx = $index) {
+                  <tr>
+                    <td class="col-id">{{ prob.id }}</td>
+                    <td class="col-title">
+                      <a [href]="prob.link" target="_blank" rel="noopener noreferrer" class="link-title">
+                        {{ prob.name }} &nearr;
+                      </a>
+                    </td>
+                    <td>
+                      <span class="diff-badge" [ngClass]="getDifficultyClass(prob.difficulty)">
+                        {{ getDifficultyName(prob.difficulty) }}
+                      </span>
+                    </td>
+                    <td class="col-deadline">
+                      {{ prob.deadline ? (prob.deadline | date:'mediumDate') : 'No Deadline' }}
+                    </td>
+                    <td>
+                      <!-- مساحة عمل وحل المسألة للمتدربين -->
+                      <a [routerLink]="['/groups', g.id, 'problems', prob.id]" class="btn-workspace">
+                        Solve / Track &rarr;
+                      </a>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    }
+  }
+</main>
+
+<!-- Modal 1: Add Trainee -->
+@if (showAddTraineeModal()) {
+  <div class="modal-backdrop" (click)="closeAddTraineeModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Add Trainee to Group</h3>
+        <button class="btn-close" (click)="closeAddTraineeModal()">✕</button>
+      </div>
+
+      <form [formGroup]="addTraineeForm" (ngSubmit)="onAddTraineeSubmit()">
+        <div class="form-group">
+          <label for="email">Trainee Email Address</label>
+          <input
+            id="email"
+            type="email"
+            formControlName="email"
+            placeholder="name@example.com"
+            [class.is-invalid]="addTraineeForm.get('email')?.touched && addTraineeForm.get('email')?.invalid"
+          />
+          @if (addTraineeForm.get('email')?.touched && addTraineeForm.get('email')?.invalid) {
+            <span class="error-text">Valid email is required.</span>
+          }
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeAddTraineeModal()">Cancel</button>
+          <button type="submit" class="btn-primary" [disabled]="isAddingTrainee()">
+            {{ isAddingTrainee() ? 'Adding...' : 'Add Trainee' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- Modal 2: Assign Problem to Group -->
+@if (showAddProblemModal()) {
+  <div class="modal-backdrop" (click)="closeAddProblemModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Assign Problem to Group</h3>
+        <button class="btn-close" (click)="closeAddProblemModal()">✕</button>
+      </div>
+
+      <form [formGroup]="addProblemForm" (ngSubmit)="onAddProblemSubmit()">
+        <div class="form-group">
+          <label for="problemId">Select Problem from Bank</label>
+          <select 
+            id="problemId" 
+            formControlName="problemId"
+            [class.is-invalid]="addProblemForm.get('problemId')?.touched && addProblemForm.get('problemId')?.invalid">
+            <option value="" disabled selected>-- Select a Problem --</option>
+            @for (p of availableProblems(); track p.id) {
+              <option [value]="p.id">{{ p.name }} ({{ getDifficultyName(p.difficulty) }})</option>
+            }
+          </select>
+          @if (addProblemForm.get('problemId')?.touched && addProblemForm.get('problemId')?.invalid) {
+            <span class="error-text">Please select a problem.</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label for="deadline">Deadline (Optional)</label>
+          <input id="deadline" type="date" formControlName="deadline" />
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeAddProblemModal()">Cancel</button>
+          <button type="submit" class="btn-primary" [disabled]="isAddingProblem()">
+            {{ isAddingProblem() ? 'Assigning...' : 'Assign Problem' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

@@ -1,0 +1,168 @@
+<app-navbar></app-navbar>
+
+<main class="problems-container">
+  <div class="page-header">
+    <div>
+      <h1>Problems Bank</h1>
+      <p>Browse competitive programming problems and sharpen your problem-solving skills.</p>
+    </div>
+    <button class="btn-primary" (click)="openCreateModal()">+ Add New Problem</button>
+  </div>
+
+  <!-- Filters & Search Bar -->
+  <div class="filters-bar">
+    <div class="search-box">
+      <input
+        type="text"
+        placeholder="Search problems by title..."
+        [value]="searchQuery()"
+        (input)="searchQuery.set($any($event.target).value)"
+      />
+    </div>
+
+    <div class="difficulty-filters">
+      <button 
+        [class.active]="selectedDifficulty() === null" 
+        (click)="selectedDifficulty.set(null)">
+        All
+      </button>
+      <button 
+        [class.active]="selectedDifficulty() === Difficulty.Easy" 
+        (click)="selectedDifficulty.set(Difficulty.Easy)">
+        Easy
+      </button>
+      <button 
+        [class.active]="selectedDifficulty() === Difficulty.Medium" 
+        (click)="selectedDifficulty.set(Difficulty.Medium)">
+        Medium
+      </button>
+      <button 
+        [class.active]="selectedDifficulty() === Difficulty.Hard" 
+        (click)="selectedDifficulty.set(Difficulty.Hard)">
+        Hard
+      </button>
+    </div>
+  </div>
+
+  @if (isLoading()) {
+    <div class="state-container">
+      <div class="spinner"></div>
+      <p>Loading problems...</p>
+    </div>
+  } @else if (errorMessage()) {
+    <div class="state-container error">
+      <p>{{ errorMessage() }}</p>
+      <button class="btn-secondary" (click)="loadProblems()">Retry</button>
+    </div>
+  } @else if (filteredProblems().length === 0) {
+    <div class="state-container empty">
+      <div class="empty-icon">💡</div>
+      <h3>No problems found</h3>
+      <p>Try changing your search keywords or add a new problem to the bank.</p>
+    </div>
+  } @else {
+    <div class="table-card">
+      <table class="problems-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Title & Notes</th>
+            <th>Difficulty</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (prob of filteredProblems(); track prob.id; let idx = $index) {
+            <tr>
+              <td class="col-id">{{ prob.id }}</td>
+              <td class="col-title">
+                <span class="problem-name">{{ prob.name }}</span>
+                @if (prob.notes) {
+                  <span class="problem-notes">📝 {{ prob.notes }}</span>
+                }
+              </td>
+              <td class="col-diff">
+                <span class="diff-badge" [ngClass]="getDifficultyClass(prob.difficulty)">
+                  {{ getDifficultyName(prob.difficulty) }}
+                </span>
+              </td>
+              <td class="col-action">
+                <a [href]="prob.link" target="_blank" rel="noopener noreferrer" class="btn-solve">
+                  Open Problem &nearr;
+                </a>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</main>
+
+<!-- Create Problem Modal -->
+@if (showCreateModal()) {
+  <div class="modal-backdrop" (click)="closeCreateModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Add Problem to Bank</h2>
+        <button class="btn-close" (click)="closeCreateModal()">✕</button>
+      </div>
+
+      <form [formGroup]="createProblemForm" (ngSubmit)="onCreateSubmit()">
+        <div class="form-group">
+          <label for="name">Problem Title</label>
+          <input
+            id="name"
+            type="text"
+            formControlName="name"
+            placeholder="e.g. Two Sum / Watermelon"
+            [class.is-invalid]="createProblemForm.get('name')?.touched && createProblemForm.get('name')?.invalid"
+          />
+          @if (createProblemForm.get('name')?.touched && createProblemForm.get('name')?.invalid) {
+            <span class="error-text">Problem title is required.</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label for="link">Problem Link</label>
+          <input
+            id="link"
+            type="url"
+            formControlName="link"
+            placeholder="https://codeforces.com/problemset/problem/..."
+            [class.is-invalid]="createProblemForm.get('link')?.touched && createProblemForm.get('link')?.invalid"
+          />
+          @if (createProblemForm.get('link')?.touched && createProblemForm.get('link')?.invalid) {
+            <span class="error-text">Please enter a valid URL (starting with http:// or https://).</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label for="difficulty">Difficulty Level</label>
+          <select id="difficulty" formControlName="difficulty">
+            <option [value]="Difficulty.Easy">Easy</option>
+            <option [value]="Difficulty.Medium">Medium</option>
+            <option [value]="Difficulty.Hard">Hard</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="notes">Notes / Hints (Optional)</label>
+          <textarea
+            id="notes"
+            rows="3"
+            formControlName="notes"
+            placeholder="Any tips, tags, or prerequisite topics..."
+          ></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeCreateModal()">Cancel</button>
+          <button type="submit" class="btn-primary" [disabled]="isCreating()">
+            {{ isCreating() ? 'Adding...' : 'Add Problem' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

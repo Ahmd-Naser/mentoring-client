@@ -1,0 +1,24 @@
+<app-navbar></app-navbar>
+
+<main class="dashboard-container">
+  <header class="welcome-header">
+    <h1>Hello, {{ currentUser()?.firstName }} 👋</h1>
+    <p>Welcome to your mentoring dashboard. Choose an action to get started.</p>
+  </header>
+
+  <section class="quick-actions">
+    <div class="action-card">
+      <div class="card-icon">👥</div>
+      <h3>Groups</h3>
+      <p>View your enrolled groups or manage the groups you own.</p>
+      <a routerLink="/groups" class="card-link">Explore Groups &rarr;</a>
+    </div>
+
+    <div class="action-card">
+      <div class="card-icon">💻</div>
+      <h3>Problems Bank</h3>
+      <p>Browse coding problems by difficulty and track your solutions.</p>
+      <a routerLink="/problems" class="card-link">View Problems &rarr;</a>
+    </div>
+  </section>
+</main>

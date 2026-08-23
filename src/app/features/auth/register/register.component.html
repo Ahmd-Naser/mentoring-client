@@ -1,0 +1,106 @@
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="auth-header">
+      <h2>Create Account</h2>
+      <p>Join Mentoring platform today</p>
+    </div>
+
+    @if (isSuccess()) {
+      <div class="success-state">
+        <div class="success-icon">✓</div>
+        <h3>Registration Successful!</h3>
+        <p>Please check your email to activate your account before logging in.</p>
+        <a routerLink="/auth/login" class="btn-primary" style="display: block; text-align: center; text-decoration: none;">
+          Go to Login
+        </a>
+      </div>
+    } @else {
+      @if (errorMessage()) {
+        <div class="alert alert-danger">
+          {{ errorMessage() }}
+        </div>
+      }
+
+      <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="firstName">First Name</label>
+            <input
+              id="firstName"
+              type="text"
+              formControlName="firstName"
+              placeholder="John"
+              [class.is-invalid]="registerForm.get('firstName')?.touched && registerForm.get('firstName')?.invalid"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="lastName">Last Name</label>
+            <input
+              id="lastName"
+              type="text"
+              formControlName="lastName"
+              placeholder="Doe"
+              [class.is-invalid]="registerForm.get('lastName')?.touched && registerForm.get('lastName')?.invalid"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input
+            id="email"
+            type="email"
+            formControlName="email"
+            placeholder="name@example.com"
+            [class.is-invalid]="registerForm.get('email')?.touched && registerForm.get('email')?.invalid"
+          />
+          @if (registerForm.get('email')?.touched && registerForm.get('email')?.invalid) {
+            <span class="error-text">Please enter a valid email.</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            formControlName="password"
+            placeholder="At least 8 characters"
+            [class.is-invalid]="registerForm.get('password')?.touched && registerForm.get('password')?.invalid"
+          />
+          @if (registerForm.get('password')?.touched && registerForm.get('password')?.errors?.['minlength']) {
+            <span class="error-text">Password must be at least 8 characters.</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label for="confirmPassword">Confirm Password</label>
+          <input
+            id="confirmPassword"
+            type="password"
+            formControlName="confirmPassword"
+            placeholder="••••••••"
+            [class.is-invalid]="registerForm.touched && registerForm.errors?.['passwordMismatch']"
+          />
+          @if (registerForm.touched && registerForm.errors?.['passwordMismatch']) {
+            <span class="error-text">Passwords do not match.</span>
+          }
+        </div>
+
+        <button type="submit" class="btn-primary" [disabled]="isLoading()">
+          @if (isLoading()) {
+            <span>Creating account...</span>
+          } @else {
+            <span>Create Account</span>
+          }
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        <span>Already have an account?</span>
+        <a routerLink="/auth/login">Sign in</a>
+      </div>
+    }
+  </div>
+</div>
