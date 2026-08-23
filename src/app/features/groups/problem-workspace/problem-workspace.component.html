@@ -1,0 +1,228 @@
+<app-navbar></app-navbar>
+
+<main class="workspace-container">
+  @if (isLoading()) {
+    <div class="state-box">
+      <div class="spinner"></div>
+      <p>Loading problem workspace...</p>
+    </div>
+  } @else if (problem(); as p) {
+    
+    <!-- Header / Meta Bar -->
+    <header class="problem-hero">
+      <div class="hero-top">
+        <a [routerLink]="['/groups', groupId()]" class="back-link">&larr; Back to Group</a>
+        @if (isStarted()) {
+          <span class="status-badge" [class.solved]="traineeProblem()?.status === ProblemStatus.Successful">
+            {{ getStatusName(traineeProblem()!.status) }}
+          </span>
+        } @else {
+          <span class="status-badge not-started">Not Started</span>
+        }
+      </div>
+
+      <div class="hero-main">
+        <h1>{{ p.name }}</h1>
+        <a [href]="p.link" target="_blank" rel="noopener noreferrer" class="btn-judge">
+          Open Problem on Judge &nearr;
+        </a>
+      </div>
+
+      @if (p.notes) {
+        <div class="notes-callout">
+          <strong>💡 Mentor Notes:</strong>
+          <p>{{ p.notes }}</p>
+        </div>
+      }
+    </header>
+
+    <!-- STATE 1: Not Started State -->
+    @if (!isStarted()) {
+      <section class="start-banner">
+        <div class="banner-icon">🎯</div>
+        <h2>Ready to tackle this problem?</h2>
+        <p>Click start to begin your solving session and activate live time tracking.</p>
+        <button class="btn-start" (click)="onStartProblem()" [disabled]="isStarting()">
+          {{ isStarting() ? 'Starting Session...' : '🚀 Start Solving' }}
+        </button>
+      </section>
+    }
+
+    <!-- STATE 2: Active Solving Workspace -->
+    @if (isStarted()) {
+      <div class="workspace-grid">
+        
+        <!-- Left: Active Session & Time Tracking -->
+        <section class="card session-card">
+          <div class="card-header">
+            <h2>⏱️ Active Session & Progress</h2>
+          </div>
+
+          <div class="timer-display">
+            <div class="timer-box">
+              <span class="timer-label">Current Active Session</span>
+              <span class="timer-digits">{{ formatSeconds(activeSessionSeconds()) }}</span>
+            </div>
+            <div class="total-box">
+              <span class="total-label">Total Time Recorded</span>
+              <span class="total-digits">{{ totalMinutes() }} mins</span>
+            </div>
+          </div>
+
+          <form [formGroup]="statusForm" (ngSubmit)="onUpdateStatus()" class="status-form">
+            <div class="form-group">
+              <label for="statusSelect">Update Problem Status & Commit Time</label>
+              <select id="statusSelect" formControlName="status">
+                <option [value]="ProblemStatus.InProgress">In Progress</option>
+                <option [value]="ProblemStatus.Attempted">Attempted</option>
+                <option [value]="ProblemStatus.Successful">Solved (Successful)</option>
+              </select>
+            </div>
+
+            <button type="submit" class="btn-secondary" [disabled]="isUpdatingStatus()">
+              {{ isUpdatingStatus() ? 'Updating...' : '💾 Save Session / Update Status' }}
+            </button>
+          </form>
+        </section>
+
+        <!-- Right: Log New Submission Form -->
+        <section class="card submission-card">
+          <div class="card-header">
+            <h2>📤 Log Submission</h2>
+          </div>
+
+          <form [formGroup]="submissionForm" (ngSubmit)="onSubmitSolution()">
+            <div class="form-group">
+              <label for="codeLink">Submission Link / Code URL *</label>
+              <input
+                id="codeLink"
+                type="url"
+                formControlName="codeLink"
+                placeholder="https://codeforces.com/submission/123456..."
+                [class.is-invalid]="submissionForm.get('codeLink')?.touched && submissionForm.get('codeLink')?.invalid"
+              />
+              @if (submissionForm.get('codeLink')?.touched && submissionForm.get('codeLink')?.invalid) {
+                <span class="err-msg">Valid submission URL is required (3 - 200 characters).</span>
+              }
+            </div>
+
+            <div class="form-group">
+              <label for="verdictSelect">Verdict *</label>
+              <select id="verdictSelect" formControlName="verdict">
+                <option [value]="SubmissionVerdict.Accepted">Accepted (AC)</option>
+                <option [value]="SubmissionVerdict.WrongAnswer">Wrong Answer (WA)</option>
+                <option [value]="SubmissionVerdict.TimeLimitExceeded">Time Limit Exceeded (TLE)</option>
+                <option [value]="SubmissionVerdict.MemoryLimitExceeded">Memory Limit Exceeded (MLE)</option>
+                <option [value]="SubmissionVerdict.RuntimeError">Runtime Error (RTE)</option>
+                <option [value]="SubmissionVerdict.CompilationError">Compilation Error (CE)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="subNotes">Remarks / Approach (Optional)</label>
+              <input id="subNotes" type="text" formControlName="notes" placeholder="e.g. Optimized using Prefix Sums" />
+            </div>
+
+            <button type="submit" class="btn-primary" [disabled]="isSubmitting()">
+              {{ isSubmitting() ? 'Submitting...' : '+ Add Submission' }}
+            </button>
+          </form>
+        </section>
+
+      </div>
+
+      <!-- STATE 3: Submissions History & Management -->
+      <section class="card history-card">
+        <div class="card-header">
+          <h2>📜 Recorded Submissions ({{ submissions().length }})</h2>
+        </div>
+
+        @if (submissions().length === 0) {
+          <div class="empty-subs">
+            <p>No submissions recorded yet for this problem. Add your first attempt above!</p>
+          </div>
+        } @else {
+          <div class="table-responsive">
+            <table class="subs-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Verdict</th>
+                  <th>Submission Link</th>
+                  <th>Date</th>
+                  <th>Remarks</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (sub of submissions(); track sub.id; let idx = $index) {
+                  <tr>
+                    <td class="col-num">{{ idx + 1 }}</td>
+                    <td>
+                      <span class="v-badge" [ngClass]="getVerdictClass(sub.verdict)">
+                        {{ getVerdictName(sub.verdict) }}
+                      </span>
+                    </td>
+                    <td class="col-link">
+                      <a [href]="sub.codeLink" target="_blank" rel="noopener noreferrer" class="link-target">
+                        View Submission &nearr;
+                      </a>
+                    </td>
+                    <td class="col-date">{{ sub.createdAt | date:'medium' }}</td>
+                    <td class="col-notes">{{ sub.notes || '-' }}</td>
+                    <td class="col-actions">
+                      <button class="btn-icon" (click)="openEditModal(sub)" title="Edit">✏️</button>
+                      <button class="btn-icon delete" (click)="onDeleteSubmission(sub.id)" title="Delete">🗑️</button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    }
+
+  }
+</main>
+
+<!-- Modal: Edit Submission -->
+@if (editingSubmission(); as sub) {
+  <div class="modal-backdrop" (click)="closeEditModal()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Edit Submission #{{ sub.id }}</h3>
+        <button class="btn-close" (click)="closeEditModal()">✕</button>
+      </div>
+
+      <form #editForm="ngForm" (ngSubmit)="onSaveEditSubmission(editForm.value)">
+        <div class="form-group">
+          <label>Submission Link *</label>
+          <input type="url" name="codeLink" [ngModel]="sub.codeLink" required minlength="3" maxlength="200" />
+        </div>
+
+        <div class="form-group">
+          <label>Verdict *</label>
+          <select name="verdict" [ngModel]="sub.verdict" required>
+            <option [value]="SubmissionVerdict.Accepted">Accepted (AC)</option>
+            <option [value]="SubmissionVerdict.WrongAnswer">Wrong Answer (WA)</option>
+            <option [value]="SubmissionVerdict.TimeLimitExceeded">Time Limit Exceeded (TLE)</option>
+            <option [value]="SubmissionVerdict.MemoryLimitExceeded">Memory Limit Exceeded (MLE)</option>
+            <option [value]="SubmissionVerdict.RuntimeError">Runtime Error (RTE)</option>
+            <option [value]="SubmissionVerdict.CompilationError">Compilation Error (CE)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Remarks</label>
+          <input type="text" name="notes" [ngModel]="sub.notes" />
+        </div>
+
+        <div class="modal-btns">
+          <button type="button" class="btn-secondary" (click)="closeEditModal()">Cancel</button>
+          <button type="submit" class="btn-primary" [disabled]="editForm.invalid">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
