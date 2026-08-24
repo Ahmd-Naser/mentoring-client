@@ -65,31 +65,35 @@ export class ProfileComponent implements OnInit {
   }
 
   loadUserProfile(): void {
-    this.isLoading.set(true);
-    this.accountService.getProfile().subscribe({
-      next: (profile) => {
-        this.userEmail.set(profile.email);
+  this.isLoading.set(true);
+  this.accountService.getProfile().subscribe({
+    next: (res: any) => {
+      // دعم الاستجابة المباشرة أو المغلفة بـ Result Pattern (res.value)
+      const profile = res?.value || res;
+
+      if (profile) {
+        this.userEmail.set(profile.email || '');
         this.profileForm.patchValue({
-          firstName: profile.firstName,
-          lastName: profile.lastName
+          firstName: profile.firstName || '',
+          lastName: profile.lastName || ''
         });
-        this.isLoading.set(false);
-      },
-      error: (err) => {
-        console.error('Failed to load profile', err);
-        // جلب البيانات من الـ AuthService كحل احتياطي
-        const cachedUser = this.authService.currentUser();
-        if (cachedUser) {
-          this.userEmail.set(cachedUser.email);
-          this.profileForm.patchValue({
-            firstName: cachedUser.firstName,
-            lastName: cachedUser.lastName
-          });
-        }
-        this.isLoading.set(false);
       }
-    });
-  }
+      this.isLoading.set(false);
+    },
+    error: (err) => {
+      console.error('Failed to load profile', err);
+      const cachedUser = this.authService.currentUser();
+      if (cachedUser) {
+        this.userEmail.set(cachedUser.email);
+        this.profileForm.patchValue({
+          firstName: cachedUser.firstName,
+          lastName: cachedUser.lastName
+        });
+      }
+      this.isLoading.set(false);
+    }
+  });
+}
 
   onUpdateProfile(): void {
   if (this.profileForm.invalid) {
@@ -101,15 +105,20 @@ export class ProfileComponent implements OnInit {
   this.profileSuccessMessage.set(null);
   this.profileErrorMessage.set(null);
 
-  this.accountService.updateProfile(this.profileForm.value).subscribe({
-    next: (updatedProfile) => {
+  const formValues = this.profileForm.value;
+
+  this.accountService.updateProfile(formValues).subscribe({
+    next: (updatedProfile: any) => {
       this.isUpdatingProfile.set(false);
       this.profileSuccessMessage.set('Profile information updated successfully.');
 
-      // 🌟 تحديث المستخدم عبر AuthService
+      // 🌟 قراءة القيم بأمان حتى لو رجع السيرفر 204 NoContent / null
+      const firstName = updatedProfile?.firstName || updatedProfile?.value?.firstName || formValues.firstName;
+      const lastName = updatedProfile?.lastName || updatedProfile?.value?.lastName || formValues.lastName;
+
       this.authService.updateCurrentUser({
-        firstName: updatedProfile.firstName || this.profileForm.value.firstName,
-        lastName: updatedProfile.lastName || this.profileForm.value.lastName
+        firstName: firstName,
+        lastName: lastName
       });
     },
     error: (err) => {
