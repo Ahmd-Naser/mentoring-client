@@ -1,0 +1,20 @@
+<div class="toast-container" aria-live="polite" aria-atomic="true">
+  @for (t of toasts(); track t.id) {
+    <div class="toast-item" [ngClass]="'toast-' + t.type">
+      <div class="toast-icon">
+        {{ getIcon(t.type) }}
+      </div>
+      
+      <div class="toast-content">
+        @if (t.title) {
+          <h4 class="toast-title">{{ t.title }}</h4>
+        }
+        <p class="toast-message">{{ t.message }}</p>
+      </div>
+
+      <button class="btn-close" (click)="toastService.remove(t.id)" aria-label="Close">
+        ✕
+      </button>
+    </div>
+  }
+</div>
