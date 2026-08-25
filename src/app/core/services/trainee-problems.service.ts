@@ -6,7 +6,7 @@ import {
   TraineeProblemMinutesResponse,
   TraineeProblemResponse,
   UpdateTraineeProblemRequest
-} from '../models/workspace.models';
+} from '../models/trainee-problem.models';
 
 @Injectable({
   providedIn: 'root'
@@ -15,37 +15,47 @@ export class TraineeProblemsService {
   private http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiUrl}/api/TraineeProblems`;
 
+  // GET api/TraineeProblems/group/{groupId}
+  getByGroup(groupId: number): Observable<TraineeProblemResponse[]> {
+    return this.http.get<TraineeProblemResponse[]>(`${this.baseUrl}/group/${groupId}`);
+  }
+
   // GET api/TraineeProblems/group/{groupId}/problem/{problemId}
   getTraineeProblem(groupId: number, problemId: number): Observable<TraineeProblemResponse> {
     return this.http.get<TraineeProblemResponse>(`${this.baseUrl}/group/${groupId}/problem/${problemId}`);
   }
 
   // GET api/TraineeProblems/group/{groupId}/problem/{problemId}/total-minutes
-  getTotalMinutesSpent(groupId: number, problemId: number): Observable<TraineeProblemMinutesResponse> {
+  getTotalMinutes(groupId: number, problemId: number): Observable<TraineeProblemMinutesResponse> {
     return this.http.get<TraineeProblemMinutesResponse>(
       `${this.baseUrl}/group/${groupId}/problem/${problemId}/total-minutes`
     );
   }
 
-  // POST api/TraineeProblems/group/{groupId}/problem/{problemId}/start
-  startProblem(groupId: number, problemId: number): Observable<TraineeProblemResponse> {
-    return this.http.post<TraineeProblemResponse>(
-      `${this.baseUrl}/group/${groupId}/problem/${problemId}/start`,
+  // POST api/TraineeProblems/group/{groupId}/problem/{problemId}/start-toggle
+  toggleTimer(groupId: number, problemId: number): Observable<void> {
+    return this.http.post<void>(
+      `${this.baseUrl}/group/${groupId}/problem/${problemId}/start-toggle`,
       {}
     );
   }
 
   // PUT api/TraineeProblems/group/{groupId}/problem/{problemId}
-  updateTraineeProblem(
+  updateStatus(
     groupId: number,
     problemId: number,
     request: UpdateTraineeProblemRequest
   ): Observable<void> {
-    return this.http.put<void>(`${this.baseUrl}/group/${groupId}/problem/${problemId}`, request);
+    return this.http.put<void>(
+      `${this.baseUrl}/group/${groupId}/problem/${problemId}`,
+      request
+    );
   }
 
   // DELETE api/TraineeProblems/group/{groupId}/problem/{problemId}
   deleteTraineeProblem(groupId: number, problemId: number): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/group/${groupId}/problem/${problemId}`);
+    return this.http.delete<void>(
+      `${this.baseUrl}/group/${groupId}/problem/${problemId}`
+    );
   }
 }

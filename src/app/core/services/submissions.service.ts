@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { SubmissionRequest, SubmissionResponse } from '../models/workspace.models';
+import { SubmissionRequest, SubmissionResponse } from '../models/trainee-problem.models';
 
 @Injectable({
   providedIn: 'root'
@@ -17,13 +17,11 @@ export class SubmissionsService {
   }
 
   // POST api/Submissions/trainee-problem/{traineeProblemId}
-  createSubmission(traineeProblemId: number, request: SubmissionRequest): Observable<SubmissionResponse> {
-    return this.http.post<SubmissionResponse>(`${this.baseUrl}/trainee-problem/${traineeProblemId}`, request);
-  }
-
-  // PUT api/Submissions/{id}
-  updateSubmission(id: number, request: SubmissionRequest): Observable<SubmissionResponse> {
-    return this.http.put<SubmissionResponse>(`${this.baseUrl}/${id}`, request);
+  addSubmission(traineeProblemId: number, request: SubmissionRequest): Observable<SubmissionResponse> {
+    return this.http.post<SubmissionResponse>(
+      `${this.baseUrl}/trainee-problem/${traineeProblemId}`,
+      request
+    );
   }
 
   // DELETE api/Submissions/{id}

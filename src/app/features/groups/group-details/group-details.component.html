@@ -12,17 +12,23 @@
       <div class="hero-top">
         <a routerLink="/groups" class="back-link">&larr; Back to Groups</a>
         @if (isOwner()) {
-          <span class="badge badge-owner">You are the Mentor (Owner)</span>
+          <div class="owner-badge-actions">
+            <span class="badge badge-owner">You are the Mentor (Owner)</span>
+            <div class="owner-controls">
+              <button class="btn-action-edit" (click)="openEditGroupModal()">✏️ Edit</button>
+              <button class="btn-action-delete" (click)="onDeleteGroup()">🗑️ Delete</button>
+            </div>
+          </div>
         } @else {
           <span class="badge badge-member">You are a Trainee</span>
         }
       </div>
 
       <h1>{{ g.name }}</h1>
-      <p class="hero-desc">{{ g.description }}</p>
+      <p class="hero-desc">{{ g.description || 'No description provided.' }}</p>
 
       <div class="hero-meta">
-        <span>👤 Mentor: <strong>{{ g.ownerName }}</strong></span>
+        <span>👤 Mentor: <strong>{{ g.ownerName || 'Mentor' }}</strong></span>
         <span>👥 Trainees: <strong>{{ trainees().length }}</strong></span>
         <span>💻 Problems: <strong>{{ groupProblems().length }}</strong></span>
       </div>
@@ -52,7 +58,7 @@
       <section class="tab-content">
         <div class="content-card">
           <h3>About this Group</h3>
-          <p>{{ g.description }}</p>
+          <p>{{ g.description || 'No description provided.' }}</p>
         </div>
 
         @if (isOwner()) {
@@ -87,12 +93,15 @@
             @for (trainee of trainees(); track (trainee.id || trainee.email || $index)) {
               <div class="trainee-item">
                 <div class="avatar">
-                  {{ (trainee.name[0] || 'U') | uppercase }}
+                  {{ (getTraineeDisplayName(trainee)[0] || 'U') | uppercase }}
                 </div>
                 <div class="info">
-                  <h4>{{ trainee.name ? trainee.name : trainee.email }}</h4>
+                  <h4>{{ getTraineeDisplayName(trainee) }}</h4>
                   <p>{{ trainee.email }}</p>
                 </div>
+                @if (isOwner()) {
+                  <button class="btn-danger-sm" (click)="onRemoveTrainee(trainee.email)">Remove</button>
+                }
               </div>
             }
           </div>
@@ -127,7 +136,7 @@
                 </tr>
               </thead>
               <tbody>
-                @for (prob of groupProblems(); track prob.problemId ; let idx = $index) {
+                @for (prob of groupProblems(); track prob.problemId; let idx = $index) {
                   <tr>
                     <td class="col-id">{{ prob.problemId }}</td>
                     <td class="col-title">
@@ -144,24 +153,21 @@
                       {{ prob.deadline ? (prob.deadline | date:'mediumDate') : 'No Deadline' }}
                     </td>
                     <td class="col-action">
-                    @if (!isOwner()) {
-                      <!-- 🎯 المتدرب: يظهر له زر الدخول لمساحة الحل والتتبع -->
-                      <a [routerLink]="['/groups', g.id, 'problems', prob.problemId]" class="btn-workspace">
-                        Solve / Track &rarr;
-                      </a>
-                    } @else {
-                      <!-- 👑 المرشد / المالك: يفتح المسألة أو يستعرض حلول المتدربين -->
-                      <a [href]="prob.link" target="_blank" rel="noopener noreferrer" class="btn-external-link">
-                        Open Problem &nearr;
-                      </a>
-                    }
-                  </td>
-                    <!-- <td> -->
-                      <!-- مساحة عمل وحل المسألة للمتدربين -->
-                      <!-- <a [routerLink]="['/groups', g.id, 'problems', prob.problemId]" class="btn-workspace"> -->
-                        <!-- Solve / Track &rarr; -->
-                      <!-- </a> -->
-                    <!-- </td> -->
+                      @if (!isOwner()) {
+                        <a [routerLink]="['/groups', g.id, 'problems', prob.problemId]" class="btn-workspace">
+                          Solve / Track &rarr;
+                        </a>
+                      } @else {
+                        <div class="mentor-table-actions">
+                          <a [href]="prob.link" target="_blank" rel="noopener noreferrer" class="btn-external-link">
+                            Open &nearr;
+                          </a>
+                          <button class="btn-danger-sm" (click)="onRemoveProblemFromGroup(prob.problemId)">
+                            Remove
+                          </button>
+                        </div>
+                      }
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -173,7 +179,52 @@
   }
 </main>
 
-<!-- Modal 1: Add Trainee -->
+<!-- Modal 1: Edit Group Details -->
+@if (showEditGroupModal()) {
+  <div class="modal-backdrop" (click)="closeEditGroupModal()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Edit Group Details</h3>
+        <button class="btn-close" (click)="closeEditGroupModal()">✕</button>
+      </div>
+
+      <form [formGroup]="editGroupForm" (ngSubmit)="onSaveGroupChanges()">
+        <div class="form-group">
+          <label for="editName">Group Name *</label>
+          <input
+            id="editName"
+            type="text"
+            formControlName="name"
+            placeholder="e.g. Problem Solving 2026"
+            [class.is-invalid]="editGroupForm.get('name')?.touched && editGroupForm.get('name')?.invalid"
+          />
+          @if (editGroupForm.get('name')?.touched && editGroupForm.get('name')?.invalid) {
+            <span class="error-text">Group name is required.</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label for="editDesc">Description</label>
+          <textarea
+            id="editDesc"
+            formControlName="description"
+            rows="3"
+            placeholder="Group goals and expectations..."
+          ></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeEditGroupModal()">Cancel</button>
+          <button type="submit" class="btn-primary" [disabled]="isSavingGroup() || editGroupForm.invalid">
+            {{ isSavingGroup() ? 'Saving...' : 'Save Changes' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- Modal 2: Add Trainee -->
 @if (showAddTraineeModal()) {
   <div class="modal-backdrop" (click)="closeAddTraineeModal()">
     <div class="modal-card" (click)="$event.stopPropagation()">
@@ -184,7 +235,7 @@
 
       <form [formGroup]="addTraineeForm" (ngSubmit)="onAddTraineeSubmit()">
         <div class="form-group">
-          <label for="email">Trainee Email Address</label>
+          <label for="email">Trainee Email Address *</label>
           <input
             id="email"
             type="email"
@@ -199,7 +250,7 @@
 
         <div class="modal-actions">
           <button type="button" class="btn-secondary" (click)="closeAddTraineeModal()">Cancel</button>
-          <button type="submit" class="btn-primary" [disabled]="isAddingTrainee()">
+          <button type="submit" class="btn-primary" [disabled]="isAddingTrainee() || addTraineeForm.invalid">
             {{ isAddingTrainee() ? 'Adding...' : 'Add Trainee' }}
           </button>
         </div>
@@ -208,7 +259,7 @@
   </div>
 }
 
-<!-- Modal 2: Assign Problem to Group -->
+<!-- Modal 3: Assign Problem to Group -->
 @if (showAddProblemModal()) {
   <div class="modal-backdrop" (click)="closeAddProblemModal()">
     <div class="modal-card" (click)="$event.stopPropagation()">
@@ -219,7 +270,7 @@
 
       <form [formGroup]="addProblemForm" (ngSubmit)="onAddProblemSubmit()">
         <div class="form-group">
-          <label for="problemId">Select Problem from Bank</label>
+          <label for="problemId">Select Problem from Bank *</label>
           <select 
             id="problemId" 
             formControlName="problemId"
@@ -241,7 +292,7 @@
 
         <div class="modal-actions">
           <button type="button" class="btn-secondary" (click)="closeAddProblemModal()">Cancel</button>
-          <button type="submit" class="btn-primary" [disabled]="isAddingProblem()">
+          <button type="submit" class="btn-primary" [disabled]="isAddingProblem() || addProblemForm.invalid">
             {{ isAddingProblem() ? 'Assigning...' : 'Assign Problem' }}
           </button>
         </div>

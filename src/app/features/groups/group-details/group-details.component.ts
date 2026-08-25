@@ -1,51 +1,76 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { CommonModule, DatePipe, UpperCasePipe } from '@angular/common';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+
+import { NavbarComponent } from '../../../shared/components/navbar/navbar.component';
 import { GroupsService } from '../../../core/services/groups.service';
 import { ProblemsService } from '../../../core/services/problems.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { GroupProblemResponse, GroupResponse, TraineeDataResponse } from '../../../core/models/group.models';
+
+import {
+  GroupDetailsResponse,
+  GroupProblemResponse,
+  TraineeInGroupResponse
+} from '../../../core/models/group.models';
 import { ProblemResponse } from '../../../core/models/problem.models';
 import { Difficulty } from '../../../core/models/enums';
-import { NavbarComponent } from '../../../shared/components/navbar/navbar.component';
 
 @Component({
   selector: 'app-group-details',
   standalone: true,
-  imports: [CommonModule, RouterLink, ReactiveFormsModule, NavbarComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    ReactiveFormsModule,
+    DatePipe,
+    UpperCasePipe,
+    NavbarComponent
+  ],
   templateUrl: './group-details.component.html',
   styleUrl: './group-details.component.scss'
 })
 export class GroupDetailsComponent implements OnInit {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private fb = inject(FormBuilder);
   private groupsService = inject(GroupsService);
   private problemsService = inject(ProblemsService);
-  public authService = inject(AuthService);
-  private fb = inject(FormBuilder);
+  private authService = inject(AuthService);
 
-  Difficulty = Difficulty;
-
-  groupId = signal<number | null>(null);
-  group = signal<GroupResponse | null>(null);
-  trainees = signal<TraineeDataResponse[]>([]);
+  // States
+  groupId = signal<number>(0);
+  group = signal<GroupDetailsResponse | null>(null);
+  trainees = signal<TraineeInGroupResponse[]>([]);
   groupProblems = signal<GroupProblemResponse[]>([]);
   availableProblems = signal<ProblemResponse[]>([]);
 
   isLoading = signal<boolean>(true);
+  activeTab = signal<'overview' | 'trainees' | 'problems'>('overview');
+
+  // Modals Visibility
+  showEditGroupModal = signal<boolean>(false);
+  showAddTraineeModal = signal<boolean>(false);
+  showAddProblemModal = signal<boolean>(false);
+
+  // Loading flags for actions
+  isSavingGroup = signal<boolean>(false);
   isAddingTrainee = signal<boolean>(false);
   isAddingProblem = signal<boolean>(false);
 
-  showAddTraineeModal = signal<boolean>(false);
-  showAddProblemModal = signal<boolean>(false);
-  activeTab = signal<'overview' | 'trainees' | 'problems'>('overview');
-
-  currentUser = this.authService.currentUser;
-
+  // Mentor/Owner Check
   isOwner = computed(() => {
-    const currentGroup = this.group();
-    const user = this.currentUser();
-    return !!(currentGroup && user && currentGroup.ownerId === user.id);
+    const user = this.authService.currentUser();
+    const g = this.group();
+    if (!user || !g) return false;
+    const currentUserId = user.id || (user as any).userId;
+    return currentUserId === g.ownerId;
+  });
+
+  // Forms
+  editGroupForm: FormGroup = this.fb.group({
+    name: ['', [Validators.required, Validators.maxLength(100)]],
+    description: ['', [Validators.maxLength(500)]]
   });
 
   addTraineeForm: FormGroup = this.fb.group({
@@ -59,50 +84,111 @@ export class GroupDetailsComponent implements OnInit {
 
   ngOnInit(): void {
     const idParam = this.route.snapshot.paramMap.get('id');
-    if (idParam) {
-      const id = Number(idParam);
-      this.groupId.set(id);
-      this.loadGroupData(id);
+    if (!idParam || isNaN(+idParam)) {
+      this.router.navigate(['/groups']);
+      return;
     }
+
+    this.groupId.set(+idParam);
+    this.loadGroupData();
   }
 
-  loadGroupData(id: number): void {
+  loadGroupData(): void {
+    const id = this.groupId();
     this.isLoading.set(true);
 
     this.groupsService.getById(id).subscribe({
-      next: (groupData) => {
+      next: (res: any) => {
+        const groupData = res?.value || res;
         this.group.set(groupData);
+        this.loadTrainees();
+        this.loadProblems();
         this.isLoading.set(false);
-        this.loadTrainees(id);
-        this.loadGroupProblems(id);
       },
-      error: () => {
+      error: (err) => {
+        console.error('Failed to load group details', err);
         this.isLoading.set(false);
+        alert('Failed to load group details.');
+        this.router.navigate(['/groups']);
       }
     });
   }
 
-  loadTrainees(id: number): void {
-    this.groupsService.getTrainees(id).subscribe({
+  loadTrainees(): void {
+    this.groupsService.getTrainees(this.groupId()).subscribe({
       next: (res: any) => {
-        const list = Array.isArray(res) ? res : res?.value || [];
-        this.trainees.set(list);
+        const list = res?.value || res;
+        this.trainees.set(Array.isArray(list) ? list : []);
       },
       error: (err) => console.error('Failed to load trainees', err)
     });
   }
 
-  loadGroupProblems(id: number): void {
-    this.groupsService.getGroupProblems(id).subscribe({
+  loadProblems(): void {
+    this.groupsService.getProblems(this.groupId()).subscribe({
       next: (res: any) => {
-        const list = Array.isArray(res) ? res : res?.value || [];
-        this.groupProblems.set(list);
+        const list = res?.value || res;
+        this.groupProblems.set(Array.isArray(list) ? list : []);
       },
       error: (err) => console.error('Failed to load group problems', err)
     });
   }
 
-  // ================= Trainee Modal =================
+  // --- Group Actions (Edit & Delete) ---
+  openEditGroupModal(): void {
+    const g = this.group();
+    if (!g) return;
+
+    this.editGroupForm.patchValue({
+      name: g.name,
+      description: g.description || ''
+    });
+    this.showEditGroupModal.set(true);
+  }
+
+  closeEditGroupModal(): void {
+    this.showEditGroupModal.set(false);
+  }
+
+  onSaveGroupChanges(): void {
+    if (this.editGroupForm.invalid || !this.group()) {
+      this.editGroupForm.markAllAsTouched();
+      return;
+    }
+
+    this.isSavingGroup.set(true);
+    const updatedValues = this.editGroupForm.value;
+
+    this.groupsService.update(this.groupId(), updatedValues).subscribe({
+      next: () => {
+        this.isSavingGroup.set(false);
+        this.group.update(curr => curr ? { ...curr, ...updatedValues } : null);
+        this.closeEditGroupModal();
+        alert('Group updated successfully!');
+      },
+      error: (err) => {
+        this.isSavingGroup.set(false);
+        alert(err?.error?.detail || err?.error?.message || 'Failed to update group');
+      }
+    });
+  }
+
+  onDeleteGroup(): void {
+    const g = this.group();
+    if (!g) return;
+
+    if (!confirm(`Are you sure you want to permanently delete the group "${g.name}"?`)) return;
+
+    this.groupsService.delete(g.id).subscribe({
+      next: () => {
+        alert('Group deleted successfully.');
+        this.router.navigate(['/groups']);
+      },
+      error: (err) => alert(err?.error?.detail || err?.error?.message || 'Failed to delete group')
+    });
+  }
+
+  // --- Trainee Actions ---
   openAddTraineeModal(): void {
     this.addTraineeForm.reset();
     this.showAddTraineeModal.set(true);
@@ -113,15 +199,20 @@ export class GroupDetailsComponent implements OnInit {
   }
 
   onAddTraineeSubmit(): void {
-    if (this.addTraineeForm.invalid || !this.groupId()) return;
+    if (this.addTraineeForm.invalid) {
+      this.addTraineeForm.markAllAsTouched();
+      return;
+    }
 
     this.isAddingTrainee.set(true);
+    const req = { email: this.addTraineeForm.value.email };
 
-    this.groupsService.addTrainee(this.groupId()!, this.addTraineeForm.value).subscribe({
+    this.groupsService.addTrainee(this.groupId(), req).subscribe({
       next: () => {
         this.isAddingTrainee.set(false);
         this.closeAddTraineeModal();
-        this.loadTrainees(this.groupId()!);
+        this.loadTrainees();
+        alert('Trainee added successfully!');
       },
       error: (err) => {
         this.isAddingTrainee.set(false);
@@ -130,18 +221,28 @@ export class GroupDetailsComponent implements OnInit {
     });
   }
 
-  // ================= Problem Modal =================
-  openAddProblemModal(): void {
-    this.addProblemForm.reset();
-    this.showAddProblemModal.set(true);
+  onRemoveTrainee(traineeEmail: string): void {
+    if (!confirm(`Remove trainee (${traineeEmail}) from this group?`)) return;
 
-    // جلب بنك المسائل ليختار منها المرشد
-    if (this.availableProblems().length === 0) {
-      this.problemsService.getAll().subscribe({
-        next: (data) => this.availableProblems.set(data),
-        error: (err) => console.error('Failed to load problems bank', err)
-      });
-    }
+    this.groupsService.removeTrainee(this.groupId(), { email: traineeEmail }).subscribe({
+      next: () => {
+        this.trainees.update(list => list.filter(t => t.email !== traineeEmail));
+      },
+      error: (err) => alert(err?.error?.detail || err?.error?.message || 'Failed to remove trainee')
+    });
+  }
+
+  // --- Problem Actions ---
+  openAddProblemModal(): void {
+    this.addProblemForm.reset({ problemId: '', deadline: '' });
+    this.problemsService.getAll().subscribe({
+      next: (res: any) => {
+        const list = res?.value || res;
+        this.availableProblems.set(Array.isArray(list) ? list : []);
+        this.showAddProblemModal.set(true);
+      },
+      error: (err) => alert('Failed to fetch available problems bank')
+    });
   }
 
   closeAddProblemModal(): void {
@@ -149,45 +250,62 @@ export class GroupDetailsComponent implements OnInit {
   }
 
   onAddProblemSubmit(): void {
-    if (this.addProblemForm.invalid || !this.groupId()) return;
+    if (this.addProblemForm.invalid) {
+      this.addProblemForm.markAllAsTouched();
+      return;
+    }
 
     this.isAddingProblem.set(true);
-    const { problemId, deadline } = this.addProblemForm.value;
+    const problemId = +this.addProblemForm.value.problemId;
 
-    const payload = {
-      problemId: Number(problemId),
-      deadline: deadline ? new Date(deadline).toISOString() : null
-    };
-
-    this.groupsService.addProblemToGroup(this.groupId()!, payload).subscribe({
+    this.groupsService.addProblem(this.groupId(), problemId).subscribe({
       next: () => {
         this.isAddingProblem.set(false);
         this.closeAddProblemModal();
-        this.loadGroupProblems(this.groupId()!);
-        this.loadGroupData(this.groupId()!);
+        this.loadProblems();
+        alert('Problem assigned to group successfully!');
       },
       error: (err) => {
         this.isAddingProblem.set(false);
-        alert(err?.error?.detail || err?.error?.message || 'Failed to assign problem to group');
+        alert(err?.error?.detail || err?.error?.message || 'Failed to assign problem');
       }
     });
   }
 
-  getDifficultyClass(diff: Difficulty): string {
-    switch (diff) {
-      case Difficulty.Easy: return 'diff-easy';
-      case Difficulty.Medium: return 'diff-medium';
-      case Difficulty.Hard: return 'diff-hard';
-      default: return '';
-    }
+  onRemoveProblemFromGroup(problemId: number): void {
+    if (!confirm('Remove this problem from the group assignment list?')) return;
+
+    this.groupsService.removeProblem(this.groupId(), problemId).subscribe({
+      next: () => {
+        this.groupProblems.update(list => list.filter(p => p.problemId !== problemId));
+      },
+      error: (err) => alert(err?.error?.detail || err?.error?.message || 'Failed to remove problem')
+    });
   }
 
-  getDifficultyName(diff: Difficulty): string {
-    switch (diff) {
-      case Difficulty.Easy: return 'Easy';
-      case Difficulty.Medium: return 'Medium';
-      case Difficulty.Hard: return 'Hard';
-      default: return 'Unknown';
+  // --- Helpers ---
+  getTraineeDisplayName(trainee: TraineeInGroupResponse): string {
+    if (trainee.firstName || trainee.lastName) {
+      return `${trainee.firstName || ''} ${trainee.lastName || ''}`.trim();
     }
+    return (trainee as any).name || trainee.email;
+  }
+
+  getDifficultyName(diff: Difficulty | number): string {
+    const map: Record<number, string> = {
+      [Difficulty.Easy]: 'Easy',
+      [Difficulty.Medium]: 'Medium',
+      [Difficulty.Hard]: 'Hard'
+    };
+    return map[diff as number] || 'Easy';
+  }
+
+  getDifficultyClass(diff: Difficulty | number): string {
+    const map: Record<number, string> = {
+      [Difficulty.Easy]: 'diff-easy',
+      [Difficulty.Medium]: 'diff-medium',
+      [Difficulty.Hard]: 'diff-hard'
+    };
+    return map[diff as number] || 'diff-easy';
   }
 }

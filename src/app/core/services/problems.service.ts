@@ -9,20 +9,30 @@ import { CreateProblemRequest, ProblemResponse } from '../models/problem.models'
 })
 export class ProblemsService {
   private http = inject(HttpClient);
-  private readonly baseUrl = `${environment.apiUrl}/api/problems`;
+  private readonly baseUrl = `${environment.apiUrl}/api/Problems`;
 
-  // جلب جميع المسائل من بنك المسائل
+  // GET api/Problems
   getAll(): Observable<ProblemResponse[]> {
     return this.http.get<ProblemResponse[]>(this.baseUrl);
   }
 
-  // جلب تفاصيل مسألة محددة
+  // GET api/Problems/{id}
   getById(id: number): Observable<ProblemResponse> {
     return this.http.get<ProblemResponse>(`${this.baseUrl}/${id}`);
   }
 
-  // إضافة مسألة جديدة إلى بنك المسائل
+  // POST api/Problems
   create(request: CreateProblemRequest): Observable<ProblemResponse> {
     return this.http.post<ProblemResponse>(this.baseUrl, request);
+  }
+
+  // PUT api/Problems/{id}
+  update(id: number, request: CreateProblemRequest): Observable<void> {
+    return this.http.put<void>(`${this.baseUrl}/${id}`, request);
+  }
+
+  // DELETE api/Problems/{id}
+  delete(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${id}`);
   }
 }

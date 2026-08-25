@@ -3,12 +3,12 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
-  AddGroupProblemRequest,
   AddTraineeRequest,
   CreateGroupRequest,
-  GroupResponse,
+  GroupDetailsResponse,
   GroupProblemResponse,
-  TraineeDataResponse
+  GroupResponse,
+  TraineeInGroupResponse
 } from '../models/group.models';
 
 @Injectable({
@@ -16,40 +16,82 @@ import {
 })
 export class GroupsService {
   private http = inject(HttpClient);
-  private readonly baseUrl = `${environment.apiUrl}/api/groups`;
+  private readonly baseUrl = `${environment.apiUrl}/api/Groups`;
 
-  // جلب جميع المجموعات
+  // GET api/Groups/me
   getAll(): Observable<GroupResponse[]> {
     return this.http.get<GroupResponse[]>(`${this.baseUrl}/me`);
   }
 
-  // جلب تفاصيل مجموعة محددة بالـ Id
-  getById(id: number): Observable<GroupResponse> {
-    return this.http.get<GroupResponse>(`${this.baseUrl}/${id}`);
+  // GET api/Groups/{id}
+  getById(id: number): Observable<GroupDetailsResponse> {
+    return this.http.get<GroupDetailsResponse>(`${this.baseUrl}/${id}`);
   }
 
-  // إنشاء مجموعة جديدة (يصبح المنشئ هو المالك/المرشد تلقائياً)
+  // POST api/Groups
   create(request: CreateGroupRequest): Observable<GroupResponse> {
-    return this.http.post<GroupResponse>(`${this.baseUrl}`, request);
+    return this.http.post<GroupResponse>(this.baseUrl, request);
   }
 
-  // إضافة متدرب للمجموعة (Owner Only)
+  // PUT api/Groups/{id}
+  update(id: number, request: CreateGroupRequest): Observable<void> {
+    return this.http.put<void>(`${this.baseUrl}/${id}`, request);
+  }
+
+  // DELETE api/Groups/{id}
+  delete(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${id}`);
+  }
+
+  // GET api/Groups/{groupId}/trainees
+  getTrainees(groupId: number): Observable<TraineeInGroupResponse[]> {
+    return this.http.get<TraineeInGroupResponse[]>(`${this.baseUrl}/${groupId}/trainees`);
+  }
+
+  // POST api/Groups/{groupId}/trainees
   addTrainee(groupId: number, request: AddTraineeRequest): Observable<void> {
     return this.http.post<void>(`${this.baseUrl}/${groupId}/trainees`, request);
   }
 
-  // جلب قائمة المتدربين في المجموعة
-  getTrainees(groupId: number): Observable<TraineeDataResponse[]> {
-    return this.http.get<TraineeDataResponse[]>(`${this.baseUrl}/${groupId}/trainees`);
+  // DELETE api/Groups/{groupId}/trainees
+  removeTrainee(groupId: number, request: AddTraineeRequest): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${groupId}/trainees`, { body: request });
   }
 
-  // 🌟 جلب المسائل المخصصة للمجموعة
-  getGroupProblems(groupId: number): Observable<GroupProblemResponse[]> {
+  // GET api/Groups/{groupId}/problems
+  getProblems(groupId: number): Observable<GroupProblemResponse[]> {
     return this.http.get<GroupProblemResponse[]>(`${this.baseUrl}/${groupId}/problems`);
   }
 
-  // 🌟 إسناد مسألة جديدة للمجموعة (Owner Only)
-  addProblemToGroup(groupId: number, request: AddGroupProblemRequest): Observable<void> {
-    return this.http.post<void>(`${this.baseUrl}/${groupId}/problems/${request.problemId}`, request);
+  // 🌟 دالة بديلة للتوافق مع الكود القديم
+getGroupProblems(groupId: number): Observable<GroupProblemResponse[]> {
+  return this.getProblems(groupId);
+}
+
+  // POST api/Groups/{groupId}/problems/{problemId}
+  // addProblem(groupId: number, problemId: number): Observable<void> {
+  //   return this.http.post<void>(`${this.baseUrl}/${groupId}/problems/${problemId}`, {});
+  // }
+
+  // DELETE api/Groups/{groupId}/problems/{problemId}
+  removeProblem(groupId: number, problemId: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${groupId}/problems/${problemId}`);
   }
+
+  // 🌟 إضافة هذا الاسم البديل للتوافق
+// addProblemToGroup(groupId: number, problemId: number): Observable<void> {
+//   return this.addProblem(groupId, problemId);
+// }
+
+addProblem(groupId: number, problemIdOrPayload: number | { problemId: number; deadline?: string | null }): Observable<void> {
+  const problemId = typeof problemIdOrPayload === 'number' 
+    ? problemIdOrPayload 
+    : problemIdOrPayload.problemId;
+
+  return this.http.post<void>(`${this.baseUrl}/${groupId}/problems/${problemId}`, {});
+}
+
+addProblemToGroup(groupId: number, problemIdOrPayload: number | { problemId: number; deadline?: string | null }): Observable<void> {
+  return this.addProblem(groupId, problemIdOrPayload);
+}
 }

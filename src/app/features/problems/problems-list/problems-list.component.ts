@@ -1,10 +1,10 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { NavbarComponent } from '../../../shared/components/navbar/navbar.component';
 import { ProblemsService } from '../../../core/services/problems.service';
 import { CreateProblemRequest, ProblemResponse } from '../../../core/models/problem.models';
 import { Difficulty } from '../../../core/models/enums';
-import { NavbarComponent } from '../../../shared/components/navbar/navbar.component';
 
 @Component({
   selector: 'app-problems-list',
@@ -17,39 +17,38 @@ export class ProblemsListComponent implements OnInit {
   private problemsService = inject(ProblemsService);
   private fb = inject(FormBuilder);
 
-  Difficulty = Difficulty;
-
+  // States
   problems = signal<ProblemResponse[]>([]);
   isLoading = signal<boolean>(true);
-  isCreating = signal<boolean>(false);
-  showCreateModal = signal<boolean>(false);
-  errorMessage = signal<string | null>(null);
+  isSubmitting = signal<boolean>(false);
 
+  // Search & Filter
   searchQuery = signal<string>('');
-  selectedDifficulty = signal<number | null>(null);
+  selectedDifficulty = signal<string>('all');
 
+  // Modal State
+  isModalOpen = signal<boolean>(false);
+  editingProblem = signal<ProblemResponse | null>(null);
+
+  Difficulty = Difficulty;
+
+  problemForm: FormGroup = this.fb.group({
+    name: ['', [Validators.required, Validators.maxLength(200)]],
+    link: ['', [Validators.required, Validators.maxLength(500)]],
+    difficulty: [Difficulty.Easy, [Validators.required]],
+    notes: ['']
+  });
+
+  // Filtered Problems Signal
   filteredProblems = computed(() => {
-    let list = this.problems();
     const query = this.searchQuery().toLowerCase().trim();
     const diff = this.selectedDifficulty();
 
-    if (query) {
-      list = list.filter((p) => p.name.toLowerCase().includes(query));
-    }
-
-    if (diff !== null) {
-      list = list.filter((p) => p.difficulty === diff);
-    }
-
-    return list;
-  });
-
-  // 🌟 تحديث النموذج لدعم link و notes
-  createProblemForm: FormGroup = this.fb.group({
-    name: ['', [Validators.required, Validators.maxLength(150)]],
-    link: ['', [Validators.required, Validators.pattern(/https?:\/\/.+/)]],
-    notes: [''],
-    difficulty: [Difficulty.Easy, [Validators.required]]
+    return this.problems().filter(p => {
+      const matchesQuery = !query || p.name.toLowerCase().includes(query);
+      const matchesDiff = diff === 'all' || p.difficulty.toString() === diff;
+      return matchesQuery && matchesDiff;
+    });
   });
 
   ngOnInit(): void {
@@ -58,74 +57,123 @@ export class ProblemsListComponent implements OnInit {
 
   loadProblems(): void {
     this.isLoading.set(true);
-    this.errorMessage.set(null);
-
     this.problemsService.getAll().subscribe({
-      next: (data) => {
-        this.problems.set(data);
+      next: (res: any) => {
+        const list = res?.value || res;
+        this.problems.set(Array.isArray(list) ? list : []);
         this.isLoading.set(false);
       },
       error: (err) => {
-        console.error(err);
+        console.error('Failed to load problems', err);
         this.isLoading.set(false);
-        this.errorMessage.set('Failed to load problems.');
       }
     });
   }
 
   openCreateModal(): void {
-    this.createProblemForm.reset({ difficulty: Difficulty.Easy, notes: '' });
-    this.showCreateModal.set(true);
+    this.editingProblem.set(null);
+    this.problemForm.reset({
+      name: '',
+      link: '',
+      difficulty: Difficulty.Easy,
+      notes: ''
+    });
+    this.isModalOpen.set(true);
   }
 
-  closeCreateModal(): void {
-    this.showCreateModal.set(false);
+  openEditModal(problem: ProblemResponse): void {
+    this.editingProblem.set(problem);
+    this.problemForm.patchValue({
+      name: problem.name,
+      link: problem.link,
+      difficulty: problem.difficulty,
+      notes: problem.notes || ''
+    });
+    this.isModalOpen.set(true);
   }
 
-  onCreateSubmit(): void {
-    if (this.createProblemForm.invalid) {
-      this.createProblemForm.markAllAsTouched();
+  closeModal(): void {
+    this.isModalOpen.set(false);
+    this.editingProblem.set(null);
+  }
+
+  onSubmit(): void {
+    if (this.problemForm.invalid) {
+      this.problemForm.markAllAsTouched();
       return;
     }
 
-    this.isCreating.set(true);
-    const formValue = this.createProblemForm.value;
-
-    const payload: CreateProblemRequest = {
+    this.isSubmitting.set(true);
+    const formValue = this.problemForm.value;
+    const requestPayload: CreateProblemRequest = {
       name: formValue.name,
       link: formValue.link,
-      notes: formValue.notes ? formValue.notes.trim() : undefined,
-      difficulty: Number(formValue.difficulty)
+      difficulty: +formValue.difficulty,
+      notes: formValue.notes || null
     };
 
-    this.problemsService.create(payload).subscribe({
-      next: (newProb) => {
-        this.problems.update((prev) => [newProb, ...prev]);
-        this.isCreating.set(false);
-        this.closeCreateModal();
+    const editTarget = this.editingProblem();
+
+    if (editTarget) {
+      // 🔄 Update Existing Problem
+      this.problemsService.update(editTarget.id, requestPayload).subscribe({
+        next: () => {
+          this.isSubmitting.set(false);
+          this.problems.update(list =>
+            list.map(p => (p.id === editTarget.id ? { ...p, ...requestPayload } : p))
+          );
+          this.closeModal();
+        },
+        error: (err) => {
+          this.isSubmitting.set(false);
+          alert(err?.error?.detail || err?.error?.message || 'Failed to update problem.');
+        }
+      });
+    } else {
+      // ➕ Create New Problem
+      this.problemsService.create(requestPayload).subscribe({
+        next: (res: any) => {
+          this.isSubmitting.set(false);
+          const created = res?.value || res;
+          this.problems.update(list => [created, ...list]);
+          this.closeModal();
+        },
+        error: (err) => {
+          this.isSubmitting.set(false);
+          alert(err?.error?.detail || err?.error?.message || 'Failed to create problem.');
+        }
+      });
+    }
+  }
+
+  onDelete(problem: ProblemResponse): void {
+    if (!confirm(`Are you sure you want to delete "${problem.name}" from the bank?`)) return;
+
+    this.problemsService.delete(problem.id).subscribe({
+      next: () => {
+        this.problems.update(list => list.filter(p => p.id !== problem.id));
       },
       error: (err) => {
-        this.isCreating.set(false);
-        alert(err?.error?.detail || err?.error?.message || 'Failed to create problem.');
+        alert(err?.error?.detail || err?.error?.message || 'Failed to delete problem.');
       }
     });
   }
 
-  getDifficultyName(diff: Difficulty): string {
-    switch (diff) {
-      case Difficulty.Easy: return 'Easy';
-      case Difficulty.Medium: return 'Medium';
-      case Difficulty.Hard: return 'Hard';
-      default: return 'Unknown';
-    }
+  getDifficultyName(diff: Difficulty | number): string {
+    const map: Record<number, string> = {
+      [Difficulty.Easy]: 'Easy',
+      [Difficulty.Medium]: 'Medium',
+      [Difficulty.Hard]: 'Hard'
+    };
+    return map[diff as number] || 'Easy';
   }
 
-  getDifficultyClass(diff: Difficulty): string {
-    switch (diff) {
+  getDifficultyClass(diff: Difficulty | number): string {
+    switch (+diff) {
       case Difficulty.Easy: return 'diff-easy';
       case Difficulty.Medium: return 'diff-medium';
       case Difficulty.Hard: return 'diff-hard';
-      default: return '';
+      default: return 'diff-easy';
     }
   }
 }

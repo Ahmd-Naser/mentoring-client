@@ -1,293 +1,308 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
-import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ProblemsService } from '../../../core/services/problems.service';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { CommonModule, DatePipe } from '@angular/common';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+
+import { NavbarComponent } from '../../../shared/components/navbar/navbar.component';
 import { TraineeProblemsService } from '../../../core/services/trainee-problems.service';
 import { SubmissionsService } from '../../../core/services/submissions.service';
+import { ProblemsService } from '../../../core/services/problems.service';
 import { ProblemResponse } from '../../../core/models/problem.models';
+import { SubmissionVerdict, ProblemStatus, Difficulty } from '../../../core/models/enums';
 import {
-  SubmissionRequest,
   SubmissionResponse,
   TraineeProblemResponse
-} from '../../../core/models/workspace.models';
-import { Difficulty, ProblemStatus, SubmissionVerdict } from '../../../core/models/enums';
-import { NavbarComponent } from '../../../shared/components/navbar/navbar.component';
+} from '../../../core/models/trainee-problem.models';
 
 @Component({
   selector: 'app-problem-workspace',
   standalone: true,
-  imports: [CommonModule, RouterLink, ReactiveFormsModule, NavbarComponent, FormsModule],
+  imports: [CommonModule, RouterLink, ReactiveFormsModule, DatePipe, NavbarComponent],
   templateUrl: './problem-workspace.component.html',
   styleUrl: './problem-workspace.component.scss'
 })
 export class ProblemWorkspaceComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private fb = inject(FormBuilder);
-  private problemsService = inject(ProblemsService);
   private traineeProblemsService = inject(TraineeProblemsService);
   private submissionsService = inject(SubmissionsService);
-
-  // Enums
-  Difficulty = Difficulty;
-  ProblemStatus = ProblemStatus;
-  SubmissionVerdict = SubmissionVerdict;
+  private problemsService = inject(ProblemsService);
 
   groupId = signal<number>(0);
   problemId = signal<number>(0);
 
   problem = signal<ProblemResponse | null>(null);
   traineeProblem = signal<TraineeProblemResponse | null>(null);
-  totalMinutes = signal<number>(0);
   submissions = signal<SubmissionResponse[]>([]);
-
-  // مؤقت الجلسة الحية (Live Timer)
-  activeSessionSeconds = signal<number>(0);
-  private timerInterval: any = null;
+  totalMinutes = signal<number>(0);
 
   isLoading = signal<boolean>(true);
-  isStarting = signal<boolean>(false);
   isSubmitting = signal<boolean>(false);
   isUpdatingStatus = signal<boolean>(false);
 
-  // نافذة تعديل Submission
-  editingSubmission = signal<SubmissionResponse | null>(null);
+  ProblemStatus = ProblemStatus;
+  SubmissionVerdict = SubmissionVerdict;
 
-  // النماذج
+  private timerInterval: any = null;
+
+  // فحص تشغيل المؤقت
+  isTimerRunning = computed(() => !!this.traineeProblem()?.lastStartedAt);
+
+  // فحص هل تم حل المسألة بنجاح (يدعم String و Number)
+  isSuccessful = computed(() => {
+    const s = this.traineeProblem()?.status?.toString().toLowerCase();
+    return s === '3' || s === 'successful' || s === 'solved';
+  });
+
   submissionForm: FormGroup = this.fb.group({
     codeLink: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(200)]],
     verdict: [SubmissionVerdict.Accepted, [Validators.required]],
     notes: ['']
   });
 
-  statusForm: FormGroup = this.fb.group({
-    status: [ProblemStatus.InProgress, [Validators.required]]
-  });
-
-  // هل بدأت المسألة مسبقاً أم لا؟
-  isStarted = computed(() => !!this.traineeProblem());
-
   ngOnInit(): void {
-    const gId = Number(this.route.snapshot.paramMap.get('groupId'));
-    const pId = Number(this.route.snapshot.paramMap.get('problemId'));
+    const gId = this.route.snapshot.paramMap.get('groupId');
+    const pId = this.route.snapshot.paramMap.get('problemId');
 
-    if (gId && pId) {
-      this.groupId.set(gId);
-      this.problemId.set(pId);
-      this.loadInitialData();
+    if (!gId || !pId) {
+      this.router.navigate(['/groups']);
+      return;
     }
+
+    this.groupId.set(+gId);
+    this.problemId.set(+pId);
+
+    this.loadWorkspaceData();
   }
 
   ngOnDestroy(): void {
-    this.stopLiveTimer();
+    this.stopLocalTimer();
   }
 
-  loadInitialData(): void {
+  loadWorkspaceData(): void {
     this.isLoading.set(true);
-    const gId = this.groupId();
-    const pId = this.problemId();
 
-    // 1. جلب بيانات المسألة
-    this.problemsService.getById(pId).subscribe({
-      next: (p) => this.problem.set(p),
-      error: (err) => console.error('Failed to load problem metadata', err)
+    this.problemsService.getById(this.problemId()).subscribe({
+      next: (res: any) => this.problem.set(res?.value || res),
+      error: (err) => console.error('Failed to load problem details', err)
     });
 
-    // 2. فحص حالة المتدرب مع هذه المسألة
-    this.traineeProblemsService.getTraineeProblem(gId, pId).subscribe({
-      next: (tp) => {
-        this.traineeProblem.set(tp);
-        this.statusForm.patchValue({ status: tp.status });
-        this.loadTotalMinutes();
-        this.loadSubmissions(tp.id);
-        this.handleSessionTimer(tp.lastStartedAt);
-        this.isLoading.set(false);
-      },
-      error: (err) => {
-        // 404 تعني أن المتدرب لم يضغط Start بعد
-        this.traineeProblem.set(null);
-        this.isLoading.set(false);
-      }
+    this.loadTraineeTrackingData(() => {
+      this.isLoading.set(false);
     });
+  }
+
+  loadTraineeTrackingData(callback?: () => void): void {
+    this.traineeProblemsService
+      .getTraineeProblem(this.groupId(), this.problemId())
+      .subscribe({
+        next: (res: any) => {
+          const tp = res?.value || res;
+          this.traineeProblem.set(tp);
+
+          if (tp?.lastStartedAt) {
+            this.startLocalTimer();
+          } else {
+            this.stopLocalTimer();
+          }
+
+          if (tp && tp.id) {
+            this.loadSubmissions(tp.id);
+          }
+          this.loadTotalMinutes();
+          if (callback) callback();
+        },
+        error: (err) => {
+          console.error('Failed to load tracking data', err);
+          if (callback) callback();
+        }
+      });
   }
 
   loadTotalMinutes(): void {
-    this.traineeProblemsService.getTotalMinutesSpent(this.groupId(), this.problemId()).subscribe({
-      next: (res) => this.totalMinutes.set(res.minutes),
-      error: () => this.totalMinutes.set(0)
-    });
+    this.traineeProblemsService
+      .getTotalMinutes(this.groupId(), this.problemId())
+      .subscribe({
+        next: (res: any) => {
+          const data = res?.value || res;
+          this.totalMinutes.set(data?.minutes || 0);
+        },
+        error: (err) => console.error('Failed to load minutes', err)
+      });
   }
 
-  loadSubmissions(tpId: number): void {
-    this.submissionsService.getAllForTraineeProblem(tpId).subscribe({
-      next: (subs) => this.submissions.set(subs || []),
+  loadSubmissions(traineeProblemId: number): void {
+    this.submissionsService.getAllForTraineeProblem(traineeProblemId).subscribe({
+      next: (res: any) => {
+        const list = res?.value || res;
+        this.submissions.set(Array.isArray(list) ? list : []);
+      },
       error: (err) => console.error('Failed to load submissions', err)
     });
   }
 
-  // بدء حل المسألة (POST /start)
-  onStartProblem(): void {
-    this.isStarting.set(true);
-    this.traineeProblemsService.startProblem(this.groupId(), this.problemId()).subscribe({
-      next: (tp) => {
-        this.traineeProblem.set(tp);
-        this.statusForm.patchValue({ status: tp.status });
-        this.handleSessionTimer(tp.lastStartedAt);
-        this.loadSubmissions(tp.id);
-        this.isStarting.set(false);
-      },
-      error: (err) => {
-        this.isStarting.set(false);
-        alert(err?.error?.detail || err?.error?.message || 'Failed to start problem session');
-      }
-    });
-  }
-
-  // تحديث الحالة وتثبيت جلسة الوقت (PUT /TraineeProblems)
-  onUpdateStatus(): void {
-    if (!this.traineeProblem()) return;
-
+  // تشغيل / إيقاف المؤقت
+  onToggleTimer(): void {
     this.isUpdatingStatus.set(true);
-    const req = { status: Number(this.statusForm.value.status) };
 
-    this.traineeProblemsService.updateTraineeProblem(this.groupId(), this.problemId(), req).subscribe({
-      next: () => {
-        this.isUpdatingStatus.set(false);
-        this.stopLiveTimer();
-        // إعادة قراءة الحالة والدقائق المحدثة من السيرفر
-        this.loadInitialData();
-        alert('Session updated successfully!');
-      },
-      error: (err) => {
-        this.isUpdatingStatus.set(false);
-        alert(err?.error?.detail || err?.error?.message || 'Failed to update problem status');
-      }
-    });
-  }
+    const isCurrentlyRunning = this.isTimerRunning();
+    // تحديث بصري فوري للزر
+    this.traineeProblem.update(tp => tp ? {
+      ...tp,
+      lastStartedAt: isCurrentlyRunning ? null : new Date().toISOString()
+    } : null);
 
-  // تسجيل تسليم جديد (POST /Submissions)
-  onSubmitSolution(): void {
-    const tp = this.traineeProblem();
-    if (!tp || this.submissionForm.invalid) {
-      this.submissionForm.markAllAsTouched();
-      return;
+    if (!isCurrentlyRunning) {
+      this.startLocalTimer();
+    } else {
+      this.stopLocalTimer();
     }
 
-    this.isSubmitting.set(true);
-    const req: SubmissionRequest = {
-      codeLink: this.submissionForm.value.codeLink.trim(),
-      verdict: Number(this.submissionForm.value.verdict),
-      notes: this.submissionForm.value.notes ? this.submissionForm.value.notes.trim() : null
-    };
-
-    this.submissionsService.createSubmission(tp.id, req).subscribe({
-      next: (newSub) => {
-        this.submissions.update((prev) => [newSub, ...prev]);
-        this.submissionForm.reset({ verdict: SubmissionVerdict.Accepted });
-        this.isSubmitting.set(false);
-
-        // إذا كان الحل Accepted، تتغير الحالة تلقائياً في السيرفر
-        if (req.verdict === SubmissionVerdict.Accepted) {
-          this.loadInitialData();
+    this.traineeProblemsService
+      .toggleTimer(this.groupId(), this.problemId())
+      .subscribe({
+        next: () => {
+          this.isUpdatingStatus.set(false);
+          this.loadTotalMinutes();
+        },
+        error: (err) => {
+          this.isUpdatingStatus.set(false);
+          this.loadTraineeTrackingData();
+          alert(err?.error?.detail || err?.error?.message || 'Failed to toggle timer');
         }
-      },
-      error: (err) => {
-        this.isSubmitting.set(false);
-        alert(err?.error?.detail || err?.error?.message || 'Failed to record submission');
-      }
-    });
+      });
   }
 
-  // حذف محاولة تسليم
-  onDeleteSubmission(subId: number): void {
-    if (!confirm('Are you sure you want to delete this submission?')) return;
-
-    this.submissionsService.deleteSubmission(subId).subscribe({
-      next: () => {
-        this.submissions.update((prev) => prev.filter((s) => s.id !== subId));
-      },
-      error: (err) => alert(err?.error?.detail || err?.error?.message || 'Failed to delete submission')
-    });
-  }
-
-  // نافذة تعديل المحاولة
-  openEditModal(sub: SubmissionResponse): void {
-    this.editingSubmission.set(sub);
-  }
-
-  closeEditModal(): void {
-    this.editingSubmission.set(null);
-  }
-
-  onSaveEditSubmission(subForm: any): void {
-    const currentSub = this.editingSubmission();
-    if (!currentSub) return;
-
-    this.submissionsService.updateSubmission(currentSub.id, subForm).subscribe({
-      next: (updated) => {
-        this.submissions.update((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-        this.closeEditModal();
-      },
-      error: (err) => alert(err?.error?.detail || err?.error?.message || 'Failed to update submission')
-    });
-  }
-
-  // التحكم في عداد الوقت الحي
-  private handleSessionTimer(lastStartedAt?: string | null): void {
-    this.stopLiveTimer();
-    if (!lastStartedAt) {
-      this.activeSessionSeconds.set(0);
-      return;
-    }
-
-    const startTime = new Date(lastStartedAt).getTime();
+  private startLocalTimer(): void {
+    this.stopLocalTimer();
     this.timerInterval = setInterval(() => {
-      const now = new Date().getTime();
-      const elapsed = Math.max(0, Math.floor((now - startTime) / 1000));
-      this.activeSessionSeconds.set(elapsed);
-    }, 1000);
+      this.loadTotalMinutes();
+    }, 30000);
   }
 
-  private stopLiveTimer(): void {
+  private stopLocalTimer(): void {
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
     }
   }
 
-  formatSeconds(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  onChangeStatus(status: ProblemStatus): void {
+    this.isUpdatingStatus.set(true);
+
+    this.traineeProblem.update(tp => tp ? { ...tp, status } : null);
+
+    this.traineeProblemsService
+      .updateStatus(this.groupId(), this.problemId(), { status })
+      .subscribe({
+        next: () => {
+          this.isUpdatingStatus.set(false);
+          this.loadTraineeTrackingData();
+        },
+        error: (err) => {
+          this.isUpdatingStatus.set(false);
+          this.loadTraineeTrackingData();
+          alert(err?.error?.detail || err?.error?.message || 'Failed to update status');
+        }
+      });
   }
 
-  getStatusName(status: ProblemStatus): string {
-    switch (status) {
-      case ProblemStatus.InProgress: return 'In Progress';
-      case ProblemStatus.Attempted: return 'Attempted';
-      case ProblemStatus.Successful: return 'Solved (Successful) ✓';
-      default: return 'Not Started';
+  onSubmitSolution(): void {
+    const tp = this.traineeProblem();
+    if (!tp || !tp.id || this.submissionForm.invalid) {
+      this.submissionForm.markAllAsTouched();
+      return;
+    }
+
+    this.isSubmitting.set(true);
+    const formValue = this.submissionForm.value;
+    const payload = {
+      codeLink: formValue.codeLink,
+      verdict: +formValue.verdict,
+      notes: formValue.notes || null
+    };
+
+    this.submissionsService.addSubmission(tp.id, payload).subscribe({
+      next: (newSub: any) => {
+        this.isSubmitting.set(false);
+        const created = newSub?.value || newSub;
+        this.submissions.update(list => [created, ...list]);
+        this.submissionForm.reset({ verdict: SubmissionVerdict.Accepted });
+
+        // تحديث فوري للحالة والعداد عند قبول الحل
+        if (+payload.verdict === +SubmissionVerdict.Accepted) {
+          this.traineeProblem.update(curr => curr ? {
+            ...curr,
+            status: ProblemStatus.Successful,
+            lastStartedAt: null
+          } : null);
+          this.stopLocalTimer();
+          this.loadTotalMinutes();
+        }
+      },
+      error: (err) => {
+        this.isSubmitting.set(false);
+        alert(err?.error?.detail || err?.error?.message || 'Failed to submit solution');
+      }
+    });
+  }
+
+  onDeleteSubmission(id: number): void {
+    if (!confirm('Are you sure you want to delete this submission?')) return;
+
+    this.submissionsService.deleteSubmission(id).subscribe({
+      next: () => {
+        this.submissions.update(list => list.filter(s => s.id !== id));
+      },
+      error: (err) => alert(err?.error?.detail || err?.error?.message || 'Failed to delete submission')
+    });
+  }
+
+  getVerdictName(verdict: SubmissionVerdict | number): string {
+    const map: Record<number, string> = {
+      [SubmissionVerdict.Accepted]: 'Accepted',
+      [SubmissionVerdict.WrongAnswer]: 'Wrong Answer',
+      [SubmissionVerdict.TimeLimitExceeded]: 'Time Limit Exceeded',
+      [SubmissionVerdict.MemoryLimitExceeded]: 'Memory Limit Exceeded',
+      [SubmissionVerdict.CompilationError]: 'Compilation Error',
+      [SubmissionVerdict.RuntimeError]: 'Runtime Error'
+    };
+    return map[verdict as number] || 'Accepted';
+  }
+
+  getVerdictClass(verdict: SubmissionVerdict | number): string {
+    switch (+verdict) {
+      case SubmissionVerdict.Accepted: return 'verdict-ac';
+      case SubmissionVerdict.WrongAnswer: return 'verdict-wa';
+      case SubmissionVerdict.TimeLimitExceeded: return 'verdict-tle';
+      default: return 'verdict-err';
     }
   }
 
-  getVerdictName(v: SubmissionVerdict): string {
-    switch (v) {
-      case SubmissionVerdict.Accepted: return 'Accepted';
-      case SubmissionVerdict.WrongAnswer: return 'Wrong Answer';
-      case SubmissionVerdict.TimeLimitExceeded: return 'Time Limit Exceeded';
-      case SubmissionVerdict.MemoryLimitExceeded: return 'Memory Limit Exceeded';
-      case SubmissionVerdict.RuntimeError: return 'Runtime Error';
-      case SubmissionVerdict.CompilationError: return 'Compilation Error';
-      default: return 'Unknown';
-    }
+  getDifficultyName(diff?: Difficulty | number): string {
+    if (diff === undefined || diff === null) return 'Problem';
+    const map: Record<number, string> = {
+      [Difficulty.Easy]: 'Easy',
+      [Difficulty.Medium]: 'Medium',
+      [Difficulty.Hard]: 'Hard'
+    };
+    return map[diff as number] || 'Easy';
   }
 
-  getVerdictClass(v: SubmissionVerdict): string {
-    switch (v) {
-      case SubmissionVerdict.Accepted: return 'v-ac';
-      case SubmissionVerdict.WrongAnswer: return 'v-wa';
-      case SubmissionVerdict.TimeLimitExceeded: return 'v-tle';
-      default: return 'v-other';
-    }
+  getStatusClass(status?: ProblemStatus | string | number): string {
+    if (status === undefined || status === null) return 'status-not-started';
+    const s = status.toString().toLowerCase();
+    if (s === '3' || s === 'successful' || s === 'solved') return 'status-solved';
+    if (s === '1' || s === 'inprogress') return 'status-in-progress';
+    return 'status-not-started';
+  }
+
+  getStatusText(status?: ProblemStatus | string | number): string {
+    if (status === undefined || status === null) return 'Not Started';
+    const s = status.toString().toLowerCase();
+    if (s === '3' || s === 'successful' || s === 'solved') return 'Successful';
+    if (s === '1' || s === 'inprogress') return 'In Progress';
+    return 'Not Started';
   }
 }
