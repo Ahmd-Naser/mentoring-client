@@ -29,3 +29,13 @@ export interface SubmissionResponse {
   verdict: SubmissionVerdict;
   createdAt: string;
 }
+
+export interface TraineeProblemReviewResponse {
+  traineeId: string;
+  traineeName: string;
+  traineeEmail: string;
+  status: ProblemStatus;
+  totalMinutes: number;
+  lastStartedAt?: string | null;
+  submissions: SubmissionResponse[];
+}

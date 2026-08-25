@@ -159,8 +159,11 @@
                         </a>
                       } @else {
                         <div class="mentor-table-actions">
-                          <a [href]="prob.link" target="_blank" rel="noopener noreferrer" class="btn-external-link">
-                            Open &nearr;
+                          <a [routerLink]="['/groups', g.id, 'problems', prob.problemId, 'review']" class="btn-review">
+                            👥 Track Trainees &rarr;
+                          </a>
+                          <a [href]="prob.link" target="_blank" rel="noopener noreferrer" class="btn-external-link" title="Open Link">
+                            &nearr;
                           </a>
                           <button class="btn-danger-sm" (click)="onRemoveProblemFromGroup(prob.problemId)">
                             Remove

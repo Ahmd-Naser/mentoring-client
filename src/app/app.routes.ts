@@ -68,6 +68,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/reset-password/reset-password.component').then(m => m.ResetPasswordComponent),
     canActivate: [guestGuard]
   },
+  {
+    path: 'groups/:groupId/problems/:problemId/review',
+    loadComponent: () => import('./features/groups/mentor-problem-review/mentor-problem-review.component')
+      .then(m => m.MentorProblemReviewComponent),
+    canActivate: [authGuard]
+  },
   { 
     path: '**',
     redirectTo: 'dashboard'

@@ -5,6 +5,7 @@ import { environment } from '../../../environments/environment';
 import {
   TraineeProblemMinutesResponse,
   TraineeProblemResponse,
+  TraineeProblemReviewResponse,
   UpdateTraineeProblemRequest
 } from '../models/trainee-problem.models';
 
@@ -58,4 +59,11 @@ export class TraineeProblemsService {
       `${this.baseUrl}/group/${groupId}/problem/${problemId}`
     );
   }
+
+  // GET api/TraineeProblems/group/{groupId}/problem/{problemId}/reviews
+getProblemReviews(groupId: number, problemId: number): Observable<TraineeProblemReviewResponse[]> {
+  return this.http.get<TraineeProblemReviewResponse[]>(
+    `${this.baseUrl}/group/${groupId}/problem/${problemId}/reviews`
+  );
+}
 }

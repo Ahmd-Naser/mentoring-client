@@ -1,0 +1,188 @@
+<app-navbar></app-navbar>
+
+<main class="review-container">
+  
+  <!-- Top Navigation & Header -->
+  <header class="review-header">
+    <a [routerLink]="['/groups', groupId()]" class="back-link">&larr; Back to Group Details</a>
+    
+    <div class="header-content">
+      <div>
+        <span class="group-subtitle">Group: {{ group()?.name || 'Loading...' }}</span>
+        <h1>{{ problem()?.name || 'Problem Progress Review' }}</h1>
+      </div>
+      @if (problem()?.link) {
+        <a [href]="problem()?.link" target="_blank" rel="noopener noreferrer" class="btn-external">
+          Open Problem Link &nearr;
+        </a>
+      }
+    </div>
+  </header>
+
+  @if (isLoading()) {
+    <div class="state-loading">
+      <div class="spinner"></div>
+      <p>Loading trainees progress...</p>
+    </div>
+  } @else {
+    
+    <!-- Summary Cards Row -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-title">Total Trainees</span>
+        <span class="stat-value">{{ stats().total }}</span>
+      </div>
+      <div class="stat-card stat-solved">
+        <span class="stat-title">Solved</span>
+        <span class="stat-value">{{ stats().solved }}</span>
+      </div>
+      <div class="stat-card stat-progress">
+        <span class="stat-title">In Progress</span>
+        <span class="stat-value">{{ stats().inProgress }}</span>
+      </div>
+      <div class="stat-card stat-time">
+        <span class="stat-title">Avg Time Spent</span>
+        <span class="stat-value">{{ stats().avgMinutes }} <small>min</small></span>
+      </div>
+    </section>
+
+    <!-- Filters & Search Controls -->
+    <section class="controls-bar">
+      <div class="search-input-box">
+        <span class="search-icon">🔍</span>
+        <input 
+          type="text" 
+          placeholder="Search by trainee name or email..." 
+          [value]="searchQuery()" 
+          (input)="searchQuery.set($any($event.target).value)" 
+        />
+      </div>
+
+      <div class="filter-tabs">
+        <button [class.active]="selectedFilter() === 'all'" (click)="selectedFilter.set('all')">
+          All ({{ stats().total }})
+        </button>
+        <button [class.active]="selectedFilter() === 'solved'" (click)="selectedFilter.set('solved')">
+          Solved ({{ stats().solved }})
+        </button>
+        <button [class.active]="selectedFilter() === 'inprogress'" (click)="selectedFilter.set('inprogress')">
+          In Progress ({{ stats().inProgress }})
+        </button>
+        <button [class.active]="selectedFilter() === 'notopened'" (click)="selectedFilter.set('notopened')">
+          Not Opened ({{ stats().notOpened }})
+        </button>
+      </div>
+    </section>
+
+    <!-- Trainees Review Table -->
+    @if (filteredReviews().length === 0) {
+      <div class="empty-state">
+        <p>No trainees matched your current filter.</p>
+      </div>
+    } @else {
+      <div class="table-card">
+        <table class="review-table">
+          <thead>
+            <tr>
+              <th>Trainee</th>
+              <th>Status</th>
+              <th>Time Spent</th>
+              <th>Submissions</th>
+              <th class="col-action">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (trainee of filteredReviews(); track trainee.traineeId) {
+              <tr>
+                <td class="col-trainee">
+                  <div class="trainee-cell">
+                    <div class="avatar">
+                      {{ (trainee.traineeName[0] || trainee.traineeEmail[0] || 'U') | uppercase }}
+                    </div>
+                    <div class="info">
+                      <h4>{{ trainee.traineeName || trainee.traineeEmail }}</h4>
+                      <p>{{ trainee.traineeEmail }}</p>
+                    </div>
+                  </div>
+                </td>
+
+                <td>
+                  <span class="status-badge" [ngClass]="getStatusClass(trainee.status)">
+                    {{ getStatusText(trainee.status) }}
+                  </span>
+                </td>
+
+                <td class="col-time">
+                  <strong>{{ trainee.totalMinutes }}</strong> mins
+                </td>
+
+                <td>
+                  <span class="subs-count-badge" [class.has-subs]="trainee.submissions.length > 0">
+                    {{ trainee.submissions.length }} {{ trainee.submissions.length === 1 ? 'submission' : 'submissions' }}
+                  </span>
+                </td>
+
+                <td class="col-action">
+                  @if (trainee.submissions.length > 0) {
+                    <button class="btn-view-subs" (click)="openSubmissionsModal(trainee)">
+                      View Code ({{ trainee.submissions.length }}) &rarr;
+                    </button>
+                  } @else {
+                    <span class="no-subs-text">No Submissions</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+  }
+</main>
+
+<!-- Submissions Detail Modal -->
+@if (activeTraineeSubmissions(); as activeTrainee) {
+  <div class="modal-backdrop" (click)="closeSubmissionsModal()">
+    <div class="modal-card modal-lg" (click)="$event.stopPropagation()">
+      
+      <div class="modal-header">
+        <div>
+          <h3>{{ activeTrainee.traineeName }}'s Submissions</h3>
+          <span class="modal-subtitle">{{ activeTrainee.traineeEmail }}</span>
+        </div>
+        <button class="btn-close" (click)="closeSubmissionsModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="submissions-list">
+          @for (sub of activeTrainee.submissions; track sub.id) {
+            <div class="sub-review-item">
+              <div class="sub-top-row">
+                <span class="verdict-tag" [ngClass]="getVerdictClass(sub.verdict)">
+                  {{ getVerdictName(sub.verdict) }}
+                </span>
+                <a [href]="sub.codeLink" target="_blank" rel="noopener noreferrer" class="link-view-code">
+                  🔗 Open Submitted Code &nearr;
+                </a>
+                <span class="sub-date">{{ sub.createdAt | date:'medium' }}</span>
+              </div>
+
+              @if (sub.notes) {
+                <div class="sub-notes-block">
+                  <strong>Notes from Trainee:</strong>
+                  <p>{{ sub.notes }}</p>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="closeSubmissionsModal()">Close</button>
+      </div>
+
+    </div>
+  </div>
+}
