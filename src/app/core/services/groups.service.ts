@@ -64,9 +64,9 @@ export class GroupsService {
   }
 
   // 🌟 دالة بديلة للتوافق مع الكود القديم
-getGroupProblems(groupId: number): Observable<GroupProblemResponse[]> {
-  return this.getProblems(groupId);
-}
+  getGroupProblems(groupId: number): Observable<GroupProblemResponse[]> {
+    return this.getProblems(groupId);
+  }
 
   // POST api/Groups/{groupId}/problems/{problemId}
   // addProblem(groupId: number, problemId: number): Observable<void> {
@@ -83,15 +83,32 @@ getGroupProblems(groupId: number): Observable<GroupProblemResponse[]> {
 //   return this.addProblem(groupId, problemId);
 // }
 
-addProblem(groupId: number, problemIdOrPayload: number | { problemId: number; deadline?: string | null }): Observable<void> {
-  const problemId = typeof problemIdOrPayload === 'number' 
-    ? problemIdOrPayload 
-    : problemIdOrPayload.problemId;
+  addProblem(
+  groupId: number, 
+  problemIdOrPayload: number | { problemId: number; deadline?: string | Date | null }
+): Observable<void> {
+  let problemId: number;
+  let deadline: string | null = null;
 
-  return this.http.post<void>(`${this.baseUrl}/${groupId}/problems/${problemId}`, {});
+  if (typeof problemIdOrPayload === 'number') {
+    problemId = problemIdOrPayload;
+  } else {
+    problemId = problemIdOrPayload.problemId;
+    if (problemIdOrPayload.deadline) {
+      deadline = new Date(problemIdOrPayload.deadline).toISOString();
+    }
+  }
+
+  // إرسال الـ deadline في الـ Body
+  const body = { deadline };
+
+  return this.http.post<void>(`${this.baseUrl}/${groupId}/problems/${problemId}`, body);
 }
 
-addProblemToGroup(groupId: number, problemIdOrPayload: number | { problemId: number; deadline?: string | null }): Observable<void> {
+addProblemToGroup(
+  groupId: number, 
+  problemIdOrPayload: number | { problemId: number; deadline?: string | Date | null }
+): Observable<void> {
   return this.addProblem(groupId, problemIdOrPayload);
 }
 }

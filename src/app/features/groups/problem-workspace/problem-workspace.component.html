@@ -30,15 +30,12 @@
           <div class="card problem-card">
             <div class="problem-heading">
               <h2>{{ tp.problemName }}</h2>
-              @if (problem()?.difficulty !== undefined) {
-                <span class="diff-badge">{{ getDifficultyName(problem()?.difficulty) }}</span>
-              }
             </div>
 
-            @if (problem()?.notes) {
+            @if (tp.notes) {
               <div class="notes-box">
                 <strong>Mentor Notes:</strong>
-                <p>{{ problem()?.notes }}</p>
+                <p>{{ tp.notes }}</p>
               </div>
             }
 
@@ -77,7 +74,7 @@
                   ✓ Mark as Solved
                 </button>
               } @else {
-                <button class="btn-reopen" (click)="onChangeStatus(ProblemStatus.InProgress)" [disabled]="isUpdatingStatus()">
+                <button class="btn-reopen" (click)="onChangeStatus(ProblemStatus.Unattempted)" [disabled]="isUpdatingStatus()">
                   ↺ Re-open Problem
                 </button>
               }

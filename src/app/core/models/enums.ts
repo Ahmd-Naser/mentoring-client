@@ -5,8 +5,7 @@ export enum Difficulty {
 }
 
 export enum ProblemStatus {
-  NotOpened = 0,
-  InProgress = 1,
+  Unattempted = 1,
   Attempted = 2,
   Successful = 3
 }

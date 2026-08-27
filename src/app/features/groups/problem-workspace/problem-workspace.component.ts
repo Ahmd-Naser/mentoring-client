@@ -6,9 +6,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { NavbarComponent } from '../../../shared/components/navbar/navbar.component';
 import { TraineeProblemsService } from '../../../core/services/trainee-problems.service';
 import { SubmissionsService } from '../../../core/services/submissions.service';
-import { ProblemsService } from '../../../core/services/problems.service';
-import { ProblemResponse } from '../../../core/models/problem.models';
-import { SubmissionVerdict, ProblemStatus, Difficulty } from '../../../core/models/enums';
+import { SubmissionVerdict, ProblemStatus } from '../../../core/models/enums';
 import {
   SubmissionResponse,
   TraineeProblemResponse
@@ -27,12 +25,10 @@ export class ProblemWorkspaceComponent implements OnInit, OnDestroy {
   private fb = inject(FormBuilder);
   private traineeProblemsService = inject(TraineeProblemsService);
   private submissionsService = inject(SubmissionsService);
-  private problemsService = inject(ProblemsService);
 
   groupId = signal<number>(0);
   problemId = signal<number>(0);
 
-  problem = signal<ProblemResponse | null>(null);
   traineeProblem = signal<TraineeProblemResponse | null>(null);
   submissions = signal<SubmissionResponse[]>([]);
   totalMinutes = signal<number>(0);
@@ -46,10 +42,8 @@ export class ProblemWorkspaceComponent implements OnInit, OnDestroy {
 
   private timerInterval: any = null;
 
-  // فحص تشغيل المؤقت
   isTimerRunning = computed(() => !!this.traineeProblem()?.lastStartedAt);
 
-  // فحص هل تم حل المسألة بنجاح (يدعم String و Number)
   isSuccessful = computed(() => {
     const s = this.traineeProblem()?.status?.toString().toLowerCase();
     return s === '3' || s === 'successful' || s === 'solved';
@@ -82,12 +76,6 @@ export class ProblemWorkspaceComponent implements OnInit, OnDestroy {
 
   loadWorkspaceData(): void {
     this.isLoading.set(true);
-
-    this.problemsService.getById(this.problemId()).subscribe({
-      next: (res: any) => this.problem.set(res?.value || res),
-      error: (err) => console.error('Failed to load problem details', err)
-    });
-
     this.loadTraineeTrackingData(() => {
       this.isLoading.set(false);
     });
@@ -142,12 +130,10 @@ export class ProblemWorkspaceComponent implements OnInit, OnDestroy {
     });
   }
 
-  // تشغيل / إيقاف المؤقت
   onToggleTimer(): void {
     this.isUpdatingStatus.set(true);
-
     const isCurrentlyRunning = this.isTimerRunning();
-    // تحديث بصري فوري للزر
+
     this.traineeProblem.update(tp => tp ? {
       ...tp,
       lastStartedAt: isCurrentlyRunning ? null : new Date().toISOString()
@@ -169,7 +155,6 @@ export class ProblemWorkspaceComponent implements OnInit, OnDestroy {
         error: (err) => {
           this.isUpdatingStatus.set(false);
           this.loadTraineeTrackingData();
-          alert(err?.error?.detail || err?.error?.message || 'Failed to toggle timer');
         }
       });
   }
@@ -190,7 +175,6 @@ export class ProblemWorkspaceComponent implements OnInit, OnDestroy {
 
   onChangeStatus(status: ProblemStatus): void {
     this.isUpdatingStatus.set(true);
-
     this.traineeProblem.update(tp => tp ? { ...tp, status } : null);
 
     this.traineeProblemsService
@@ -200,10 +184,9 @@ export class ProblemWorkspaceComponent implements OnInit, OnDestroy {
           this.isUpdatingStatus.set(false);
           this.loadTraineeTrackingData();
         },
-        error: (err) => {
+        error: () => {
           this.isUpdatingStatus.set(false);
           this.loadTraineeTrackingData();
-          alert(err?.error?.detail || err?.error?.message || 'Failed to update status');
         }
       });
   }
@@ -230,7 +213,6 @@ export class ProblemWorkspaceComponent implements OnInit, OnDestroy {
         this.submissions.update(list => [created, ...list]);
         this.submissionForm.reset({ verdict: SubmissionVerdict.Accepted });
 
-        // تحديث فوري للحالة والعداد عند قبول الحل
         if (+payload.verdict === +SubmissionVerdict.Accepted) {
           this.traineeProblem.update(curr => curr ? {
             ...curr,
@@ -241,21 +223,17 @@ export class ProblemWorkspaceComponent implements OnInit, OnDestroy {
           this.loadTotalMinutes();
         }
       },
-      error: (err) => {
+      error: () => {
         this.isSubmitting.set(false);
-        alert(err?.error?.detail || err?.error?.message || 'Failed to submit solution');
       }
     });
   }
 
   onDeleteSubmission(id: number): void {
-    if (!confirm('Are you sure you want to delete this submission?')) return;
-
     this.submissionsService.deleteSubmission(id).subscribe({
       next: () => {
         this.submissions.update(list => list.filter(s => s.id !== id));
-      },
-      error: (err) => alert(err?.error?.detail || err?.error?.message || 'Failed to delete submission')
+      }
     });
   }
 
@@ -280,21 +258,12 @@ export class ProblemWorkspaceComponent implements OnInit, OnDestroy {
     }
   }
 
-  getDifficultyName(diff?: Difficulty | number): string {
-    if (diff === undefined || diff === null) return 'Problem';
-    const map: Record<number, string> = {
-      [Difficulty.Easy]: 'Easy',
-      [Difficulty.Medium]: 'Medium',
-      [Difficulty.Hard]: 'Hard'
-    };
-    return map[diff as number] || 'Easy';
-  }
-
   getStatusClass(status?: ProblemStatus | string | number): string {
     if (status === undefined || status === null) return 'status-not-started';
     const s = status.toString().toLowerCase();
     if (s === '3' || s === 'successful' || s === 'solved') return 'status-solved';
-    if (s === '1' || s === 'inprogress') return 'status-in-progress';
+    if (s === '2' || s === 'attempted') return 'status-attempted';
+    if (s === '1' || s === 'unattempted' || s === 'inprogress') return 'status-unattempted';
     return 'status-not-started';
   }
 
@@ -302,7 +271,8 @@ export class ProblemWorkspaceComponent implements OnInit, OnDestroy {
     if (status === undefined || status === null) return 'Not Started';
     const s = status.toString().toLowerCase();
     if (s === '3' || s === 'successful' || s === 'solved') return 'Successful';
-    if (s === '1' || s === 'inprogress') return 'In Progress';
+    if (s === '2' || s === 'attempted') return 'Attempted';
+    if (s === '1' || s === 'unattempted' || s === 'inprogress') return 'Unattempted';
     return 'Not Started';
   }
 }

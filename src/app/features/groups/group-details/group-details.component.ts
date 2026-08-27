@@ -46,7 +46,7 @@ export class GroupDetailsComponent implements OnInit {
   availableProblems = signal<ProblemResponse[]>([]);
 
   isLoading = signal<boolean>(true);
-  activeTab = signal<'overview' | 'trainees' | 'problems'>('overview');
+  activeTab = signal<'overview' | 'trainees' | 'problems'>('problems');
 
   // Modals Visibility
   showEditGroupModal = signal<boolean>(false);
@@ -250,27 +250,33 @@ export class GroupDetailsComponent implements OnInit {
   }
 
   onAddProblemSubmit(): void {
-    if (this.addProblemForm.invalid) {
-      this.addProblemForm.markAllAsTouched();
-      return;
-    }
-
-    this.isAddingProblem.set(true);
-    const problemId = +this.addProblemForm.value.problemId;
-
-    this.groupsService.addProblem(this.groupId(), problemId).subscribe({
-      next: () => {
-        this.isAddingProblem.set(false);
-        this.closeAddProblemModal();
-        this.loadProblems();
-        alert('Problem assigned to group successfully!');
-      },
-      error: (err) => {
-        this.isAddingProblem.set(false);
-        alert(err?.error?.detail || err?.error?.message || 'Failed to assign problem');
-      }
-    });
+  if (this.addProblemForm.invalid) {
+    this.addProblemForm.markAllAsTouched();
+    return;
   }
+
+  this.isAddingProblem.set(true);
+  
+  // ✅ استخراج القيمتين معاً
+  const formValue = this.addProblemForm.value;
+  const payload = {
+    problemId: +formValue.problemId,
+    deadline: formValue.deadline || null
+  };
+
+  this.groupsService.addProblem(this.groupId(), payload).subscribe({
+    next: () => {
+      this.isAddingProblem.set(false);
+      this.closeAddProblemModal();
+      this.loadProblems();
+      alert('Problem assigned to group successfully!');
+    },
+    error: (err) => {
+      this.isAddingProblem.set(false);
+      alert(err?.error?.detail || err?.error?.message || 'Failed to assign problem');
+    }
+  });
+}
 
   onRemoveProblemFromGroup(problemId: number): void {
     if (!confirm('Remove this problem from the group assignment list?')) return;

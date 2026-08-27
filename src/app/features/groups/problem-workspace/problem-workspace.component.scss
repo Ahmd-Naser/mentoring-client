@@ -416,4 +416,64 @@
     color: #475569;
     border: 1px solid #e2e8f0;
   }
+
+  // تم عمل Submissions لكن لم تُقبل بعد (برتقالي / أصفر)
+  // &.status-attempted {
+  //   background: #fef3c7;
+  //   color: #b45309;
+  //   border: 1px solid #fde68a;
+  // }
+
+  // // تم فتحها وبدء التايمر فقط بدون أي Submissions (أزرق)
+  // &.status-unattempted {
+  //   background: #eff6ff;
+  //   color: #2563eb;
+  //   border: 1px solid #bfdbfe;
+  // }
+}
+
+/* التنسيق الأساسي للشارة */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: capitalize;
+  border: 1px solid transparent;
+}
+
+/* 1. تم فتحها وبدء التايمر فقط بدون أي تسليمات (أزرق) */
+.status-badge.status-unattempted,
+.status-unattempted {
+  background-color: #eff6ff !important;
+  color: #2563eb !important;
+  border-color: #bfdbfe !important;
+}
+
+/* 2. تم إرسال محاولات لكن لم تُقبل بعد (أصفر / برتقالي) */
+.status-badge.status-attempted,
+.status-attempted {
+  background-color: #fef3c7 !important;
+  color: #b45309 !important;
+  border-color: #fde68a !important;
+}
+
+/* 3. تم حل المسألة بنجاح (أخضر) */
+.status-badge.status-solved,
+.status-solved {
+  background-color: #dcfce7 !important;
+  color: #15803d !important;
+  border-color: #bbf7d0 !important;
+}
+
+/* 4. لم يتم فتحها بعد (رمادي) */
+.status-badge.status-not-started,
+.status-not-started {
+  background-color: #f1f5f9 !important;
+  color: #64748b !important;
+  border-color: #e2e8f0 !important;
 }

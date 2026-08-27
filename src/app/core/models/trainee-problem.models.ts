@@ -8,6 +8,7 @@ export interface TraineeProblemResponse {
   id: number;
   problemName: string;
   problemLink: string;
+  notes?: string | null; // 🌟 تمت إضافتها هنا
   status: ProblemStatus;
   lastStartedAt?: string | null;
 }
