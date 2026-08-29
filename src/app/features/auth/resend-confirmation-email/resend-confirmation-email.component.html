@@ -1,0 +1,36 @@
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="auth-header">
+      <h2>Resend Confirmation</h2>
+      <p>Enter your email address and we'll send you another confirmation link.</p>
+    </div>
+
+    <form (ngSubmit)="resend()">
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input 
+          type="email" 
+          id="email" 
+          [(ngModel)]="email" 
+          name="email" 
+          required 
+          placeholder="name@example.com" 
+          [disabled]="isLoading"
+        />
+      </div>
+
+      <button type="submit" class="btn-primary" [disabled]="isLoading || !email">
+        {{ isLoading ? 'Sending...' : 'Resend Email' }}
+      </button>
+    </form>
+
+    <div *ngIf="message" [class.alert-danger]="isError" [class.alert-success]="!isError" class="alert">
+      {{ message }}
+    </div>
+
+    <div class="auth-footer">
+      Remembered your password? 
+      <a routerLink="/auth/login">Back to Login</a>
+    </div>
+  </div>
+</div>
