@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { guestGuard } from './core/guards/guest.guard';
 import { authGuard } from './core/guards/auth.guard';
+import { ResendConfirmationComponent } from './features/auth/resend-confirmation-email/resend-confirmation-email.component';
 
 export const routes: Routes = [
   {
@@ -73,6 +74,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/groups/mentor-problem-review/mentor-problem-review.component')
       .then(m => m.MentorProblemReviewComponent),
     canActivate: [authGuard]
+  },
+  {
+    // 🌟 طلب إعادة إرسال إيميل التفعيل
+    path: 'auth/resend-confirmation',
+    loadComponent: () => import('./features/auth/resend-confirmation-email/resend-confirmation-email.component').then(m => m.ResendConfirmationComponent),
+    canActivate: [guestGuard]
   },
   { 
     path: '**',
