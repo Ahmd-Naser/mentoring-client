@@ -69,8 +69,12 @@
             placeholder="At least 8 characters"
             [class.is-invalid]="registerForm.get('password')?.touched && registerForm.get('password')?.invalid"
           />
-          @if (registerForm.get('password')?.touched && registerForm.get('password')?.errors?.['minlength']) {
+          @if (registerForm.get('password')?.touched && registerForm.get('password')?.errors?.['required']) {
+            <span class="error-text">Password is required.</span>
+          } @else if (registerForm.get('password')?.touched && registerForm.get('password')?.errors?.['minlength']) {
             <span class="error-text">Password must be at least 8 characters.</span>
+          } @else if (registerForm.get('password')?.touched && registerForm.get('password')?.errors?.['pattern']) {
+            <span class="error-text">Must contain uppercase, lowercase, number, and a special character.</span>
           }
         </div>
 
@@ -81,9 +85,11 @@
             type="password"
             formControlName="confirmPassword"
             placeholder="••••••••"
-            [class.is-invalid]="registerForm.touched && registerForm.errors?.['passwordMismatch']"
+            [class.is-invalid]="registerForm.get('confirmPassword')?.touched && (registerForm.get('confirmPassword')?.invalid || registerForm.hasError('passwordMismatch'))"
           />
-          @if (registerForm.touched && registerForm.errors?.['passwordMismatch']) {
+          @if (registerForm.get('confirmPassword')?.touched && registerForm.get('confirmPassword')?.errors?.['required']) {
+            <span class="error-text">Please confirm your password.</span>
+          } @else if (registerForm.get('confirmPassword')?.touched && registerForm.hasError('passwordMismatch')) {
             <span class="error-text">Passwords do not match.</span>
           }
         </div>
