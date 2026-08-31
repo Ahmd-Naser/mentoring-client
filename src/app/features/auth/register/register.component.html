@@ -73,7 +73,7 @@
             <span class="error-text">Password is required.</span>
           } @else if (registerForm.get('password')?.touched && registerForm.get('password')?.errors?.['minlength']) {
             <span class="error-text">Password must be at least 8 characters.</span>
-          } @else if (registerForm.get('password')?.touched && registerForm.get('password')?.errors?.['pattern']) {
+          } @else if (registerForm.get('password')?.touched && registerForm.get('password')?.errors?.['weakPassword']) {
             <span class="error-text">Must contain uppercase, lowercase, number, and a special character.</span>
           }
         </div>

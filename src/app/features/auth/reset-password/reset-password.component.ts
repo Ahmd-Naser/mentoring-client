@@ -11,6 +11,7 @@ import {
 } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
 import { ResetPasswordRequest } from '../../../core/models/auth.models';
+import { CustomValidators } from '../../../shared/validators/custom-validators';
 
 @Component({
   selector: 'app-reset-password',
@@ -33,7 +34,7 @@ export class ResetPasswordComponent implements OnInit {
 
   resetForm: FormGroup = this.fb.group(
     {
-      newPassword: ['', [Validators.required, Validators.minLength(8) , Validators.pattern(/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9])/)]],
+      newPassword: ['', [Validators.required, Validators.minLength(8), CustomValidators.passwordValidator()]],
       confirmNewPassword: ['', [Validators.required]]
     },
     { validators: this.passwordMatchValidator }
